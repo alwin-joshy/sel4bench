@@ -83,8 +83,11 @@ if(NOT Sel4benchAllowSettingsOverride)
     endif()
 
     if(HARDWARE)
-        set(KernelBenchmarks "generic" CACHE STRING "" FORCE)
+        # set(KernelBenchmarks "generic" CACHE STRING "" FORCE)
+        # set(KernelBenchmarks "tracepoints" CACHE STRING "" FORCE)
+        # set(KernelMaxNumTracePoints 3 CACHE INT "" FORCE)
         set(AppHardwareBench ON CACHE BOOL "" FORCE)
+        # set(AppIrqBench ON CACHE BOOL "" FORCE)
     elseif(VCPU)
         # The VCPU benchmarks require the kernel entry and exit timestamp feature.
         set(AppVcpuBench ON CACHE BOOL "" FORCE)
