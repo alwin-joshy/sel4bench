@@ -82,20 +82,7 @@ static inline seL4_Word fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL
     return ip;
 }
 
-/* Pair for measuring fault -> fault handler path */
-static void measure_fault_fn(int argc, char **argv)
-{
-    assert(argc == N_FAULTER_ARGS);
-    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
-    seL4_CPtr done_ep = atol(argv[2]);
-
-    for (int i = 0; i < N_RUNS; i++) {
-        /* record time */
-        SEL4BENCH_READ_CCNT(*start);
-        fault();
-    }
-    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
-}
+/* Set of functions and helpers to test vm fault performance*/
 
 #define BAD_VADDR 0x7EDCBA987650
 #define GOOD_MAGIC 0x15831851
@@ -215,6 +202,21 @@ static void measure_vm_fault_handler_fn(int argc, char **argv) {
     seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
     /* block */
     seL4_Wait(ep, NULL);
+}
+
+/* Pair for measuring fault -> fault handler path */
+static void measure_fault_fn(int argc, char **argv)
+{
+    assert(argc == N_FAULTER_ARGS);
+    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+    for (int i = 0; i < N_RUNS + 1; i++) {
+        /* record time */
+        SEL4BENCH_READ_CCNT(*start);
+        fault();
+    }
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
 }
 
 static void measure_fault_handler_fn(int argc, char **argv)
