@@ -90,7 +90,23 @@ static inline seL4_Word fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL
 
 extern char read_fault_address[];
 extern char read_fault_restart_address[];
-static inline void read_fault(void) {
+//static inline void read_fault(void) {
+//    int *x = (int *)BAD_VADDR;
+//    int val = BAD_MAGIC;
+//    asm volatile(
+//    "mov x0, %[val]\n\t"
+//    "read_fault_address:\n\t"
+//    "ldr x0, [%[addrreg]]\n\t"
+//    "read_fault_restart_address:\n\t"
+//    "mov %[val], x0\n\t"
+//    : [val] "+r"(val)
+//    : [addrreg] "r"(x)
+//    : "x0"
+//    );
+//    assert(val == GOOD_MAGIC);
+//}
+
+static void __attribute__((noinline)) read_fault(void) {
     int *x = (int *)BAD_VADDR;
     int val = BAD_MAGIC;
     asm volatile(
@@ -104,19 +120,6 @@ static inline void read_fault(void) {
     : "x0"
     );
     assert(val == GOOD_MAGIC);
-}
-
-static void measure_vm_fault_fn(int argc, char **argv) {
-    assert (argc == N_FAULTER_ARGS);
-    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
-    seL4_CPtr done_ep = atol(argv[2]);
-
-    for (int i = 0; i < N_RUNS + 1; i++) {
-        SEL4BENCH_READ_CCNT(*start);
-        read_fault();
-    }
-
-    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
 }
 
 static void __attribute__((noinline))
@@ -162,6 +165,19 @@ set_good_magic_and_set_pc(seL4_CPtr tcb, seL4_Word new_pc)
     assert(!error);
 }
 
+static void measure_vm_fault_fn(int argc, char **argv) {
+    assert (argc == N_FAULTER_ARGS);
+    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+    for (int i = 0; i < N_RUNS + 1; i++) {
+        SEL4BENCH_READ_CCNT(*start);
+        read_fault();
+    }
+
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+}
+
 static void measure_vm_fault_handler_fn(int argc, char **argv) {
     seL4_CPtr ep, done_ep, reply, tcb;
     volatile ccnt_t *start;
@@ -203,6 +219,64 @@ static void measure_vm_fault_handler_fn(int argc, char **argv) {
     /* block */
     seL4_Wait(ep, NULL);
 }
+
+static void measure_vm_fault_reply_fn(int argc, char **argv) {
+    assert(argc == N_FAULTER_ARGS);
+    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
+    fault_results_t *results = (fault_results_t *) atol(argv[1]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+
+    /* handle 1 fault first to make sure start is set */
+    read_fault();
+    for (int i = 0; i < N_RUNS + 1; i++) {
+        read_fault();
+        ccnt_t end;
+        SEL4BENCH_READ_CCNT(end);
+        results->vm_fault_reply[i] = end - *start;
+    }
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+}
+
+static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
+{
+    seL4_CPtr ep, done_ep, reply, tcb;
+    volatile ccnt_t *start;
+    ccnt_t end;
+    fault_results_t *results;
+    seL4_Word badge = 0;
+
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
+    seL4_Word junk;
+
+
+    /* signal driver to convert us to passive and block */
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
+    } else {
+        /* wait for first fault */
+        seL4_RecvWith1MR(ep, &junk, reply);
+    }
+
+    for (int i = 0; i <= N_RUNS; i++) {
+        seL4_SetMR(seL4_VMFault_Addr, 0);
+        set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+        /* record time */
+        SEL4BENCH_READ_CCNT(*start);
+        /* wait for fault */
+        DO_REAL_REPLY_RECV_1(ep, junk, reply);
+    }
+
+    seL4_SetMR(seL4_VMFault_Addr, 0);
+    set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+    seL4_ReplyWith1MR(junk, reply);
+
+    /* tell benchmark we are done and that there are no errors */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ep, NULL);
+}
+
 
 /* Pair for measuring fault -> fault handler path */
 static void measure_fault_fn(int argc, char **argv)
@@ -375,6 +449,9 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
 
     /* Benchmark vm fault */
     run_benchmark(measure_vm_fault_fn, measure_vm_fault_handler_fn, done_ep.cptr);
+
+    /* Benchmark vm fault */
+    run_benchmark(measure_vm_fault_reply_fn, measure_vm_fault_reply_handler_fn, done_ep.cptr);
 
 //    ZF_LOGE("made it here");
 
