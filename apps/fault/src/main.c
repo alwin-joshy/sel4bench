@@ -375,15 +375,15 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
     run_benchmark(measure_vm_fault_fn, measure_vm_fault_handler_fn, done_ep.cptr);
 
 //    ZF_LOGE("made it here");
-//
+
     /* benchmark fault */
     run_benchmark(measure_fault_fn, measure_fault_handler_fn, done_ep.cptr);
 
     /* benchmark reply */
     run_benchmark(measure_fault_reply_fn, measure_fault_reply_handler_fn, done_ep.cptr);
-//
-//    /* benchmark round_trip */
-//    run_benchmark(measure_fault_roundtrip_fn, measure_fault_roundtrip_handler_fn, done_ep.cptr);
+
+    /* benchmark round_trip */
+    run_benchmark(measure_fault_roundtrip_fn, measure_fault_roundtrip_handler_fn, done_ep.cptr);
 }
 
 void measure_overhead(fault_results_t *results)
