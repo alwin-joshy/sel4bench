@@ -382,13 +382,15 @@ static inline void read_mapping_fault(char *address){
     : [addr]"r"(*address)
     /* no clobbers */
     );
+    //ZF_LOGE("here %d", value);
 }
 
 static inline void write_mapping_fault(char *address){
     char value = 'a';
-    asm volatile ("str %[val], [%[addr]]"
-    : [val]"=r"(value)
-    : [addr]"r"(address)
+    char output;
+    asm volatile ("str %[val], %[addr]"
+    :
+    : [val]"r"(value), [addr]"m"(address)
     /* no clobbers */
     );
 }
@@ -398,7 +400,7 @@ static void measure_vm_fault_map_fn(int argc, char **argv) {
     fault_results_t *results = (fault_results_t *) atol(argv[1]);
     seL4_CPtr done_ep = atol(argv[2]);
 
-    char *address = (void *)0x60000000;
+    char *address = (char *)0x60000000;
 
     for (int i = 0; i < N_RUNS + 1; i++) {
         /* record time */
@@ -416,7 +418,7 @@ static void measure_vm_fault_map_fn(int argc, char **argv) {
         //ZF_LOGE("%llu %llu %llu", end, start, end - start);
 
         // Without this log/print (it can be anything >= 1 char after read_mapping_fault), the whole thing just hangs for some reason.
-        //printf(" ");
+        printf(" ");
 
         // Added to try and minimize the extra logging latency
         volatile int j;
@@ -449,13 +451,13 @@ static void measure_vm_fault_map_handler_fn(int argc, char **argv) {
     int err;
     for (int i = 0; i < N_RUNS; i++) {
         //ZF_LOGE("handler %llx", seL4_GetMR(seL4_VMFault_Addr));
-        err = seL4_ARCH_Page_Map(caps[i], SEL4UTILS_PD_SLOT, 0x60000000 + i * (1 << seL4_PageBits), seL4_CanRead,
+        err = seL4_ARCH_Page_Map(caps[i], SEL4UTILS_PD_SLOT, 0x60000000 + i * (1 << seL4_PageBits), seL4_AllRights,
                                 seL4_ARCH_Default_VMAttributes);
         api_reply_recv(ep, seL4_MessageInfo_new(0, 0, 0, 0), NULL, reply);
     }
 
     //ZF_LOGE("here %llx %llx", seL4_GetMR(seL4_VMFault_Addr), seL4_VMFault_IP);
-    err = seL4_ARM_Page_Map(caps[N_RUNS], SEL4UTILS_PD_SLOT, 0x60000000 + N_RUNS * (1 << seL4_PageBits), seL4_CanRead,
+    err = seL4_ARM_Page_Map(caps[N_RUNS], SEL4UTILS_PD_SLOT, 0x60000000 + N_RUNS * (1 << seL4_PageBits), seL4_AllRights,
                             seL4_ARCH_Default_VMAttributes);
 
     if (config_set(CONFIG_KERNEL_MCS)) {
