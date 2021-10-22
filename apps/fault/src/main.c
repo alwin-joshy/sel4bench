@@ -387,10 +387,9 @@ static inline void read_mapping_fault(char *address){
 
 static inline void write_mapping_fault(char *address){
     char value = 'a';
-    char output;
-    asm volatile ("str %[val], %[addr]"
+    asm volatile ("str %[val], [%[addr]]"
     :
-    : [val]"r"(value), [addr]"m"(address)
+    : [val]"r"(value), [addr]"r"(address)
     /* no clobbers */
     );
 }
@@ -457,7 +456,7 @@ static void measure_vm_fault_map_handler_fn(int argc, char **argv) {
     }
 
     //ZF_LOGE("here %llx %llx", seL4_GetMR(seL4_VMFault_Addr), seL4_VMFault_IP);
-    err = seL4_ARM_Page_Map(caps[N_RUNS], SEL4UTILS_PD_SLOT, 0x60000000 + N_RUNS * (1 << seL4_PageBits), seL4_AllRights,
+    err = seL4_ARCH_Page_Map(caps[N_RUNS], SEL4UTILS_PD_SLOT, 0x60000000 + N_RUNS * (1 << seL4_PageBits), seL4_AllRights,
                             seL4_ARCH_Default_VMAttributes);
 
     if (config_set(CONFIG_KERNEL_MCS)) {
