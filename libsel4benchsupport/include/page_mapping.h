@@ -76,8 +76,12 @@ char *phase_name[] = {
     "Prepare Page Tables",
     "Allocate Pages",
     "Mapping",
-    "Protect Pages as Read Only",
-    "Unprotect Pages"
+    "Map again at a different vaddr (including cap copy)",
+    "Protect Pages one by one as Read Only",
+    "Protect Pages in range as Read Only",
+    "Unprotect Pages",
+    "Unmap Pages using range_unmap",
+    "Unmap pages one by one with page_unmap"
 };
 
 typedef struct page_mapping_results {
