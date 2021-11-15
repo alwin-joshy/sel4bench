@@ -166,6 +166,8 @@ static seL4_Word inline map2(seL4_CPtr original_cptr_start, seL4_CPtr *free_slot
 }
 
 /* Benchmark Child Process */
+#define RANGE_SIZE 32
+
 static void
 bench_proc(int argc UNUSED, char *argv[])
 {
@@ -236,11 +238,20 @@ bench_proc(int argc UNUSED, char *argv[])
     send_result(result_ep, end - start);
 
     /* Protect mapped page as seL4_CanRead with range protect */
+    seL4_Word start_range = addr + npage * PAGE_SIZE_4K; 
+    seL4_Word page_range; 
+    seL4_Word end_addr = start_range + npage * PAGE_SIZE_4K;
+
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
-
-    long err = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, addr + npage * PAGE_SIZE_4K, addr + npage * PAGE_SIZE_4K
-                                             + npage * PAGE_SIZE_4K);
+    
+    while (start_range < end_addr) {
+        page_range = ((end_addr < start_range + PAGE_SIZE_4K * RANGE_SIZE) ? (end_addr - start_range)/PAGE_SIZE_4K : RANGE_SIZE);
+        long err = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, page_range);
+        start_range += PAGE_SIZE_4K * page_range;
+    }
+    // long err = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, addr + npage * PAGE_SIZE_4K, addr + npage * PAGE_SIZE_4K
+    //                                          + npage * PAGE_SIZE_4K);
 
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
@@ -258,14 +269,27 @@ bench_proc(int argc UNUSED, char *argv[])
     send_result(result_ep, end - start);
 
     /* cleaning the original mapping*/
+    start_range = addr; 
+    end_addr = start_range + npage * PAGE_SIZE_4K;
+
+
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
+    long errc; 
 
-    err = seL4_ARM_VSpace_Range_Unmap(SEL4UTILS_PD_SLOT, addr, addr + npage * PAGE_SIZE_4K);
+    while (start_range < end_addr) {
+        page_range = ((end_addr < start_range + PAGE_SIZE_4K * RANGE_SIZE) ? (end_addr - start_range)/PAGE_SIZE_4K : RANGE_SIZE);
+        long err = seL4_ARM_VSpace_Range_Unmap(SEL4UTILS_PD_SLOT, start_range, page_range);
+        if (err) errc = err;
+        start_range += PAGE_SIZE_4K * page_range;
+    }
+
+    //err = seL4_ARM_VSpace_Range_Unmap(SEL4UTILS_PD_SLOT, addr, addr + npage * PAGE_SIZE_4K);
 
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
+    // send_result(result_ep, end - start);
+    send_result(result_ep, errc);
 
 //    for (int i = 0; i < NUM_PAGE_TABLE(npage); i++) {
 //        err = seL4_ARCH_PageTable_Unmap(pt_ptr_start + i);
@@ -275,15 +299,16 @@ bench_proc(int argc UNUSED, char *argv[])
     /* Cleaning up the map2 mappings */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
-
     for (int i = 0; i < npage; i++) {
-        err = seL4_ARCH_Page_Unmap(map2_ptr_start + i);
+        long err = seL4_ARCH_Page_Unmap(map2_ptr_start + i);
         ZF_LOGF_IFERR(err, "ummap page failed\n");
     }
 
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
+    
+
 //
 //    for (int i = 0; i < NUM_PAGE_TABLE(npage); i++) {
 //        err = seL4_ARCH_PageTable_Unmap(map2_pt_ptr_start + i);
