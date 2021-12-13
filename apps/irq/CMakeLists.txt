@@ -19,5 +19,9 @@ list(SORT deps)
 add_executable(irq EXCLUDE_FROM_ALL ${deps})
 
 if(AppIrqBench)
-    target_link_libraries(irq sel4benchirq_Config sel4_autoconf sel4benchsupport)
+    target_link_libraries(irq sel4benchirq_Config sel4_autoconf sel4benchsupport platsupport sel4platsupport)
+endif()
+
+if(AppIrqBench)
+    set_property(GLOBAL APPEND PROPERTY sel4benchapps_property "$<TARGET_FILE:irq>")
 endif()

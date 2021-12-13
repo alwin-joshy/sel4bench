@@ -135,6 +135,7 @@ int run_benchmark(env_t *env, benchmark_t *benchmark, void *local_results_vaddr,
 
     NAME_THREAD(process.thread.tcb.cptr, benchmark->name);
 
+
     /* set up shared memory for results */
     args->results = vspace_share_mem(&env->vspace, &process.vspace, local_results_vaddr,
                                      benchmark->results_pages, seL4_PageBits, seL4_AllRights, true);
@@ -271,7 +272,7 @@ void *main_continued(void *arg)
         ipc_benchmark_new(),
         irq_benchmark_new(),
         irquser_benchmark_new(),
-        scheduler_benchmark_new(),
+        //scheduler_benchmark_new(),
         signal_benchmark_new(),
         fault_benchmark_new(),
         hardware_benchmark_new(),

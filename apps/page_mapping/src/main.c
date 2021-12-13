@@ -18,6 +18,8 @@
 
 #if defined(CONFIG_ARCH_X86_64)
 #define DEFAULT_DEPTH 64
+#elif defined(CONFIG_ARCH_AARCH64)
+#define DEFAULT_DEPTH 64
 #else
 #define DEFAULT_DEPTH 32
 #endif /* defined(CONFIG_ARCH_X86_64) */
@@ -37,7 +39,7 @@ typedef struct helper_thread {
     char argv_strings[NUM_ARGS][WORD_STRING_SIZE];
 } helper_thread_t;
 
-static void inline prepare_page_table(seL4_Word addr, int npage, seL4_CPtr untyped,
+static long inline prepare_page_table(seL4_Word addr, int npage, seL4_CPtr untyped,
                                       seL4_CPtr *free_slot)
 {
     long err UNUSED;
@@ -122,7 +124,6 @@ static void inline prepare_pages(int npage, seL4_CPtr untyped,
         err = untyped_retype_root(untyped, seL4_ARCH_4KPage, seL4_PageBits,
                                   *free_slot);
         assert(err == 0);
-
         (*free_slot)++;
     }
 }
@@ -143,7 +144,7 @@ static void inline map_pages(seL4_Word addr, seL4_CPtr page_cap, int npage)
     static void inline func(seL4_CPtr addr, seL4_CPtr page_cap, int npage){\
         long err UNUSED;\
         for(int i = 0; i < npage; i++){\
-            err = seL4_ARCH_Page_Map(page_cap, SEL4UTILS_PD_SLOT, addr, right,\
+            err = seL4_ARCH_Page_Map(page_cap, SEL4UTILS_PD_SLOT, addr + i * PAGE_SIZE_4K, right,\
                             seL4_ARCH_Default_VMAttributes);\
             assert(err == 0);\
             page_cap++;\
@@ -467,7 +468,7 @@ int main(int argc, char *argv[])
 
     measure_overhead(results);
     for (int i = 0; i < RUNS; i++) {
-        for (int j = 0; j < TESTS; j++) {
+        for (int j = 0; j < TESTS - 1; j++) {
             proc.untyped = sel4utils_copy_path_to_process(&proc.process,
                                                           untyped_path);
             proc.npage = page_mapping_benchmark_params[j].npage;
