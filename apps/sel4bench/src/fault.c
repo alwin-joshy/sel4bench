@@ -44,8 +44,6 @@ static json_t *fault_process(void *results)
     result = process_result(N_RUNS, raw_results->fault, desc);
     json_array_append_new(array, result_set_to_json(set));
 
-<<<<<<< HEAD
-=======
     /*VM Faults */
     desc.stable = true,
     desc.name = "fault overhead (vm fault)",
@@ -71,7 +69,6 @@ static json_t *fault_process(void *results)
     result = process_result(N_RUNS, raw_results->vm_fault, desc);
     json_array_append_new(array, result_set_to_json(set));
 
->>>>>>> a8e4c83 (fixed mapping benchmarks)
     /* calculate the overhead of reading the cycle count (fault handler -> faulter path
      * does not include a call to seL4_ReplyRecv_ */
 
