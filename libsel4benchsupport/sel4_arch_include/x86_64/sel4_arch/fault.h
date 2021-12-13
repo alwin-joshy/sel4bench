@@ -13,6 +13,25 @@
 #include <sel4bench/arch/sel4bench.h>
 
 #ifdef CONFIG_KERNEL_MCS
+
+#define DO_REPLY_RECV(ep, tag, ro, sys) do { \
+    uint64_t ep_copy = ep; \
+    register seL4_Word ro_copy asm("r12") = ro;\
+    asm volatile( \
+            "movq   %%rsp, %%rbx \n" \
+            sys "\n" \
+            "movq  %%rbx, %%rsp \n" \
+            : \
+            "+S" (tag), \
+            "+D" (ep_copy) \
+            : \
+            "d"((seL4_Word)seL4_SysReplyRecv), \
+            "r" (ro_copy) \
+            : \
+            "rcx", "rbx","r11" \
+            ); \
+} while (0)
+
 #define DO_REPLY_RECV_1(ep, msg0, ro, sys) do { \
     uint64_t ep_copy = ep; \
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1); \
@@ -52,6 +71,22 @@ static inline void seL4_ReplyWith1MR(seL4_Word mr0, seL4_CPtr dest)
 }
 
 #else
+#define DO_REPLY_RECV(ep, tag, ro, sys) do { \
+    uint64_t ep_copy = ep; \
+    asm volatile( \
+            "movq   %%rsp, %%rbx \n" \
+            sys "\n" \
+            "movq  %%rbx, %%rsp \n" \
+            : \
+            "+S" (tag), \
+            "+D" (ep_copy) \
+            : \
+            "d"((seL4_Word)seL4_SysReplyRecv) \
+            : \
+            "rcx", "rbx","r11" \
+            ); \
+} while (0)
+
 #define DO_REPLY_RECV_1(ep, msg0, ro, sys) do { \
     uint64_t ep_copy = ep; \
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 1); \
@@ -89,7 +124,8 @@ static inline void seL4_ReplyWith1MR(seL4_Word mr0, UNUSED seL4_CPtr dest)
 }
 #endif /* CONFIG_KERNEL_MCS */
 
-
+#define DO_REAL_REPLY_RECV(ep, tag, ro) DO_REPLY_RECV(ep, tag, ro, "syscall")
+#define DO_NOP_REPLY_RECV(ep, tag, ro) DO_REPLY_RECV(ep, tag, ro, ".byte 0x66\n.byte 0x90")
 #define DO_REAL_REPLY_RECV_1(ep, mr0, ro) DO_REPLY_RECV_1(ep, mr0, ro, "syscall")
 #define DO_NOP_REPLY_RECV_1(ep, mr0, ro) DO_REPLY_RECV_1(ep, mr0, ro, ".byte 0x66\n.byte 0x90")
 
