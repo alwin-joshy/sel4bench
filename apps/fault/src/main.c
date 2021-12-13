@@ -80,8 +80,6 @@ static inline seL4_Word fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL
     return ip;
 }
 
-<<<<<<< HEAD
-=======
 /* Set of functions and helpers to test vm fault performance*/
 
 #define BAD_VADDR 0x7EDCBA987650
@@ -313,7 +311,6 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
 }
 
 
->>>>>>> a8e4c83 (fixed mapping benchmarks)
 /* Pair for measuring fault -> fault handler path */
 static void measure_fault_fn(int argc, char **argv)
 {
@@ -421,8 +418,6 @@ static void measure_fault_roundtrip_handler_fn(int argc, char **argv)
     fault_handler_done(ep, ip, done_ep, reply);
 }
 
-<<<<<<< HEAD
-=======
 static inline void read_mapping_fault(char *address){
     char value;
     asm volatile ("mov %[val], %[addr]"
@@ -512,7 +507,6 @@ static void measure_vm_fault_map_handler_fn(int argc, char **argv) {
     seL4_Wait(ep, NULL);
 }
 
->>>>>>> a8e4c83 (fixed mapping benchmarks)
 void run_benchmark(void *faulter_fn, void *handler_fn, seL4_CPtr done_ep)
 {
     int error = sel4utils_start_thread(&fault_handler, (sel4utils_thread_entry_fn) handler_fn,
@@ -560,8 +554,6 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
     error = vka_alloc_endpoint(&env->slab_vka, &done_ep);
     assert(error == 0);
 
-<<<<<<< HEAD
-=======
     seL4_CPtr pd;
     seL4_CPtr pt;
     seL4_CPtr caps[N_RUNS + 1];
@@ -610,7 +602,6 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
         }
 #endif
 
->>>>>>> a8e4c83 (fixed mapping benchmarks)
     /* create faulter */
     ccnt_t start = 0;
 
@@ -632,8 +623,6 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
 
     /* benchmark round_trip */
     run_benchmark(measure_fault_roundtrip_fn, measure_fault_roundtrip_handler_fn, done_ep.cptr);
-<<<<<<< HEAD
-=======
 
 #ifdef CONFIG_ARCH_AARCH64
 /* Benchmark vm fault mapping  */
@@ -650,7 +639,6 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
         err = seL4_ARM_PageDirectory_Unmap(pd);
         ZF_LOGF_IFERR(err, "unmsp page dir failed\n");
 #endif
->>>>>>> a8e4c83 (fixed mapping benchmarks)
 }
 
 void measure_overhead(fault_results_t *results)
