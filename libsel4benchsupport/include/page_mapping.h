@@ -75,13 +75,15 @@ benchmark_params_t page_mapping_benchmark_params[] = {
 char *phase_name[] = {
     "Prepare Page Tables",
     "Allocate Pages",
-    "Mapping",
-    "Map again at a different vaddr (including cap copy)",
+    "Clean frame mapping (old page map implementation)",
+    "Clean frame mapping (new page map implementation)",
     "Protect Pages one by one as Read Only",
     "Protect Pages in range as Read Only",
     "Unprotect Pages",
     "Unmap Pages using range_unmap",
-    "Unmap pages one by one with page_unmap"
+    "Unmap pages one by one with page_unmap",
+    "Reuse stale caps with unmap + page_map",
+    "Reuse stale caps with vspace_page_map"
 };
 
 typedef struct page_mapping_results {

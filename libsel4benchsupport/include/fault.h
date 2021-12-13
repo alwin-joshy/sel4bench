@@ -12,6 +12,7 @@
 
 typedef struct {
     ccnt_t reply_recv_overhead[N_RUNS];
+    ccnt_t reply_recv_1_overhead[N_RUNS];
     ccnt_t ccnt_overhead[N_RUNS];
 
     /* we ignore the last result for the following,
