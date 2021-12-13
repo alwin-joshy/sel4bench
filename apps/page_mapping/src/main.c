@@ -244,29 +244,10 @@ bench_proc(int argc UNUSED, char *argv[])
     SEL4BENCH_READ_CCNT(start);
     
     while (start_range < end_addr) {
-<<<<<<< HEAD
-<<<<<<< HEAD
         seL4_ARM_VSpace_Range_Remap_t remap_ret = seL4_ARM_VSpace_Range_Remap(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_CanRead);
         assert(remap_ret.error == 0);
         start_range = remap_ret.next_vaddr;
     }
-=======
-        page_range = ((end_addr < start_range + PAGE_SIZE_4K * RANGE_SIZE) ? (end_addr - start_range)/PAGE_SIZE_4K : RANGE_SIZE);
-        long err = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, page_range);
-        start_range += PAGE_SIZE_4K * page_range;
-=======
-        seL4_ARM_VSpace_Range_Remap_t remap_ret = seL4_ARM_VSpace_Range_Remap(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_CanRead);
-        assert(remap_ret.error == 0);
-        start_range = remap_ret.next_vaddr;
->>>>>>> a8e4c83 (fixed mapping benchmarks)
-    }
-<<<<<<< HEAD
-    // long err = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, addr + npage * PAGE_SIZE_4K, addr + npage * PAGE_SIZE_4K
-    //                                          + npage * PAGE_SIZE_4K);
->>>>>>> 43f92e6 (updated benchmarks for range based protect and unmap)
-=======
->>>>>>> 14a1988 (updated benchmarks)
-
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
@@ -297,7 +278,7 @@ bench_proc(int argc UNUSED, char *argv[])
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
-    
+
     /* Cleaning up the map2 mappings */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);

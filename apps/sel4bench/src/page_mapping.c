@@ -71,7 +71,6 @@ static json_t *process_mapping_results(void *r)
             result_desc_t desc = {
                 .name = page_mapping_benchmark_params[i].name,
                .overhead = overhead,
-                // .overhead = 0,
             };
             results[i][j] =
                 process_result(RUNS, raw_results->benchmarks_result[i][j], desc);
