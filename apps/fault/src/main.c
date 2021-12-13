@@ -22,13 +22,17 @@
 #include <arch/fault.h>
 
 #define N_FAULTER_ARGS 3
-#define N_HANDLER_ARGS 5
+//#define N_HANDLER_ARGS 5
+#define N_HANDLER_ARGS 7
+
+static seL4_CPtr caps[100];
 
 static char faulter_args[N_FAULTER_ARGS][WORD_STRING_SIZE];
 static char *faulter_argv[N_FAULTER_ARGS];
-static sel4utils_thread_t faulter;
 
+static sel4utils_thread_t faulter;
 sel4utils_thread_t fault_handler;
+
 char handler_args[N_HANDLER_ARGS][WORD_STRING_SIZE];
 char *handler_argv[N_HANDLER_ARGS];
 
@@ -44,7 +48,7 @@ static inline void fault(void)
 
 static void parse_handler_args(int argc, char **argv,
                                seL4_CPtr *ep, volatile ccnt_t **start, fault_results_t **results,
-                               seL4_CPtr *done_ep, seL4_CPtr *reply)
+                               seL4_CPtr *done_ep, seL4_CPtr *reply, seL4_CPtr *tcb)
 {
     assert(argc == N_HANDLER_ARGS);
     *ep = atol(argv[0]);
@@ -52,6 +56,7 @@ static void parse_handler_args(int argc, char **argv,
     *results = (fault_results_t *) atol(argv[2]);
     *done_ep = atol(argv[3]);
     *reply = atol(argv[4]);
+    *tcb = atol(argv[5]);
 }
 
 static inline void fault_handler_done(seL4_CPtr ep, seL4_Word ip, seL4_CPtr done_ep, seL4_CPtr reply)
@@ -328,18 +333,16 @@ static void measure_fault_fn(int argc, char **argv)
 
 static void measure_fault_handler_fn(int argc, char **argv)
 {
-    seL4_CPtr ep, done_ep, reply;
+    seL4_CPtr ep, done_ep, reply, tcb;
     volatile ccnt_t *start;
     ccnt_t end;
     fault_results_t *results;
 
-    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply);
-
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
     seL4_Word ip = fault_handler_start(ep, done_ep, reply);
     for (int i = 0; i < N_RUNS; i++) {
         ip += UD_INSTRUCTION_SIZE;
         DO_REAL_REPLY_RECV_1(ep, ip, reply);
-
         SEL4BENCH_READ_CCNT(end);
         results->fault[i] = end - *start;
     }
@@ -367,11 +370,11 @@ static void measure_fault_reply_fn(int argc, char **argv)
 
 static void measure_fault_reply_handler_fn(int argc, char **argv)
 {
-    seL4_CPtr ep, done_ep, reply;
+    seL4_CPtr ep, done_ep, reply, tcb;
     volatile ccnt_t *start;
     fault_results_t *results;
 
-    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply);
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
 
     seL4_Word ip = fault_handler_start(ep, done_ep, reply);
     for (int i = 0; i <= N_RUNS; i++) {
@@ -397,17 +400,21 @@ static void measure_fault_roundtrip_fn(int argc, char **argv)
         fault();
         SEL4BENCH_READ_CCNT(end);
         results->round_trip[i] = end - start;
+        volatile int j;
+        for (j = 0; j < 10000; j++) {
+
+        }
     }
     seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
 }
 
 static void measure_fault_roundtrip_handler_fn(int argc, char **argv)
 {
-    seL4_CPtr ep, done_ep, reply;
+    seL4_CPtr ep, done_ep, reply, tcb;
     UNUSED volatile ccnt_t *start;
     fault_results_t *results;
 
-    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply);
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
 
     seL4_Word ip = fault_handler_start(ep, done_ep, reply);
     for (int i = 0; i < N_RUNS; i++) {
@@ -543,6 +550,8 @@ void run_benchmark(void *faulter_fn, void *handler_fn, seL4_CPtr done_ep)
     ZF_LOGF_IF(error, "Failed to suspend fault handler");
 }
 
+#define PAGE_PER_TABLE BIT(seL4_PageTableBits - seL4_WordSizeBits)
+
 static void run_fault_benchmark(env_t *env, fault_results_t *results)
 {
     /* allocate endpoint */
@@ -604,7 +613,6 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
 
     /* create faulter */
     ccnt_t start = 0;
-
     benchmark_configure_thread(env, fault_endpoint.cptr, seL4_MinPrio + 1, "faulter", &faulter);
     sel4utils_create_word_args(faulter_args, faulter_argv, N_FAULTER_ARGS, (seL4_Word) &start,
                                (seL4_Word) results, done_ep.cptr);
@@ -613,7 +621,13 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
     benchmark_configure_thread(env, seL4_CapNull, seL4_MinPrio, "fault handler", &fault_handler);
     sel4utils_create_word_args(handler_args, handler_argv, N_HANDLER_ARGS,
                                fault_endpoint.cptr, (seL4_Word) &start,
-                               (seL4_Word) results, done_ep.cptr, fault_handler.reply.cptr);
+                               (seL4_Word) results, done_ep.cptr, fault_handler.reply.cptr, faulter.tcb.cptr, (seL4_Word) caps);
+
+    /* Benchmark vm fault */
+    run_benchmark(measure_vm_fault_fn, measure_vm_fault_handler_fn, done_ep.cptr);
+
+    /* Benchmark vm fault */
+    run_benchmark(measure_vm_fault_reply_fn, measure_vm_fault_reply_handler_fn, done_ep.cptr);
 
     /* benchmark fault */
     run_benchmark(measure_fault_fn, measure_fault_handler_fn, done_ep.cptr);

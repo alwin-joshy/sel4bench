@@ -70,7 +70,11 @@ static json_t *process_mapping_results(void *r)
         for (int j = 0; j < NPHASE; j++) {
             result_desc_t desc = {
                 .name = page_mapping_benchmark_params[i].name,
+<<<<<<< HEAD
                .overhead = overhead,
+=======
+                .overhead = overhead
+>>>>>>> 3bd7e8fa89ff110f2ecfebecef7a07fa3079f105
             };
             results[i][j] =
                 process_result(RUNS, raw_results->benchmarks_result[i][j], desc);
