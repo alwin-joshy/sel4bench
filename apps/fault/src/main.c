@@ -80,6 +80,215 @@ static inline seL4_Word fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL
     return ip;
 }
 
+/* Set of functions and helpers to test vm fault performance*/
+
+#define BAD_VADDR 0x7EDCBA987650
+
+extern char read_fault_address[];
+extern char read_fault_restart_address[];
+
+static void __attribute__((noinline)) read_fault(void)
+{
+    int *x = (int *)BAD_VADDR;
+    /* Do a read fault. */
+#if defined(CONFIG_ARCH_AARCH32)
+    asm volatile(
+        "read_fault_address:\n\t"
+        "ldr r0, [%[addrreg]]\n\t"
+        "read_fault_restart_address:\n\t"
+        :
+        : [addrreg] "r"(x)
+        : "r0"
+    );
+#elif defined(CONFIG_ARCH_AARCH64)
+    asm volatile(
+        "read_fault_address:\n\t"
+        "ldr x0, [%[addrreg]]\n\t"
+        "read_fault_restart_address:\n\t"
+        :
+        : [addrreg] "r"(x)
+        : "x0"
+    );
+#elif defined(CONFIG_ARCH_RISCV)
+    asm volatile(
+        "read_fault_address:\n\t"
+        LOAD_S " a0, 0(%[addrreg])\n\t"
+        "read_fault_restart_address:\n\t"
+        :
+        : [addrreg] "r"(x)
+        : "a0"
+    );
+#elif defined(CONFIG_ARCH_X86)
+    asm volatile(
+        "read_fault_address:\n\t"
+        "mov (%[addrreg]), %%eax\n\t"
+        "read_fault_restart_address:\n\t"
+        :
+        : [addrreg] "r"(x)
+        : "eax"
+    );
+#else
+#error "Unknown architecture."
+#endif
+}
+
+static void __attribute__((noinline))
+set_good_magic_and_set_pc(seL4_CPtr tcb, seL4_Word new_pc)
+{
+    /* Set their register to GOOD_MAGIC and set PC past fault. */
+    int error;
+    seL4_UserContext ctx;
+    error = seL4_TCB_ReadRegisters(tcb,
+                                   false,
+                                   0,
+                                   sizeof(ctx) / sizeof(seL4_Word),
+                                   &ctx);
+    assert(!error);
+#if defined(CONFIG_ARCH_AARCH32)
+    assert(ctx.r0 == BAD_MAGIC);
+    ctx.pc = new_pc;
+#elif defined(CONFIG_ARCH_AARCH64)
+    ctx.pc = new_pc;
+#elif defined(CONFIG_ARCH_RISCV)
+    ctx.pc = new_pc;
+#elif defined(CONFIG_ARCH_X86_64)
+    ctx.rip = new_pc;
+#elif defined(CONFIG_ARCH_IA32)
+    ctx.eip = new_pc;
+#else
+#error "Unknown architecture."
+#endif
+    error = seL4_TCB_WriteRegisters(tcb,
+                                    false,
+                                    0,
+                                    sizeof(ctx) / sizeof(seL4_Word),
+                                    &ctx);
+    assert(!error);
+}
+
+static void measure_vm_fault_fn(int argc, char **argv) {
+    assert (argc == N_FAULTER_ARGS);
+    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+    for (int i = 0; i < N_RUNS + 1; i++){
+        // ZF_LOGE("Faulter: %d", i);
+        SEL4BENCH_READ_CCNT(*start);
+        read_fault();
+    }
+
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+}
+
+static void measure_vm_fault_handler_fn(int argc, char **argv) {
+    seL4_CPtr ep, done_ep, reply, tcb;
+    volatile ccnt_t *start;
+    ccnt_t end;
+    fault_results_t *results;
+    seL4_Word badge = 0;
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
+
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
+
+    seL4_Word junk;
+
+    /* signal driver to convert us to passive and block */
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
+    } else {
+        /* wait for first fault */
+        api_recv(ep, NULL, reply);
+    }
+
+    for (int i = 0; i < N_RUNS; i++) {
+        /* Clear MRs to ensure they get repopulated. */
+        set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+        int msg = 0;
+        DO_REAL_REPLY_RECV_1(ep, msg, reply);
+        // DO_REAL_REPLY_RECV(ep, tag, reply);
+        SEL4BENCH_READ_CCNT(end);
+        results->vm_fault[i] = end - *start;
+        // ZF_LOGE("Handler: %d", i);
+        volatile int j;
+        for (j = 0; j < 10000; j++) {
+
+        }
+        
+    }
+
+    set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        seL4_Send(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    } else {
+        api_reply(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    }
+    /* tell benchmark we are done and that there are no errors */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ep, NULL);
+}
+
+static void measure_vm_fault_reply_fn(int argc, char **argv) {
+    assert(argc == N_FAULTER_ARGS);
+    volatile ccnt_t *start = (volatile ccnt_t *) atol(argv[0]);
+    fault_results_t *results = (fault_results_t *) atol(argv[1]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+
+    /* handle 1 fault first to make sure start is set */
+    read_fault();
+    for (int i = 0; i < N_RUNS + 1; i++) {
+        read_fault();
+        ccnt_t end;
+        SEL4BENCH_READ_CCNT(end);
+        results->vm_fault_reply[i] = end - *start;
+    }
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+}
+
+static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
+{
+    seL4_CPtr ep, done_ep, reply, tcb;
+    volatile ccnt_t *start;
+    ccnt_t end;
+    fault_results_t *results;
+    seL4_Word badge = 0;
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
+
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
+
+    /* signal driver to convert us to passive and block */
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
+    } else {
+        /* wait for first fault */
+        api_recv(ep, NULL, reply);
+    }
+
+    for (int i = 0; i <= N_RUNS; i++) {
+        set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+        /* record time */
+        SEL4BENCH_READ_CCNT(*start);
+        /* wait for fault */
+        int msg = 0;
+        DO_REAL_REPLY_RECV_1(ep, msg, reply);
+        // DO_REAL_REPLY_RECV(ep, tag, reply);
+    }
+
+    set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        seL4_Send(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    } else {
+        api_reply(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    }
+
+    /* tell benchmark we are done and that there are no errors */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ep, NULL);
+}
+
+
 /* Pair for measuring fault -> fault handler path */
 static void measure_fault_fn(int argc, char **argv)
 {
@@ -185,6 +394,89 @@ static void measure_fault_roundtrip_handler_fn(int argc, char **argv)
         DO_REAL_REPLY_RECV_1(ep, ip, reply);
     }
     fault_handler_done(ep, ip, done_ep, reply);
+}
+
+static inline void read_mapping_fault(char *address){
+    char value;
+    asm volatile ("mov %[val], %[addr]"
+    : [val]"=r"(value)
+    : [addr]"r"(*address)
+    /* no clobbers */
+    );
+}
+
+static inline void write_mapping_fault(char *address){
+    char value = 'a';
+    asm volatile ("str %[val], [%[addr]]"
+    :
+    : [val]"r"(value), [addr]"r"(address)
+    /* no clobbers */
+    );
+}
+
+#define START_ADDR 0xA0000000
+
+static void measure_vm_fault_map_fn(int argc, char **argv) {
+    assert(argc == N_FAULTER_ARGS);
+    fault_results_t *results = (fault_results_t *) atol(argv[1]);
+    seL4_CPtr done_ep = atol(argv[2]);
+
+    char *address = (char *)START_ADDR;
+
+    for (int i = 0; i < N_RUNS + 1; i++) {
+        /* record time */
+        ccnt_t start, end;
+        /* Making sure that the page is in the cache so that the results are not influenced by that */
+        read_mapping_fault(address);
+
+        SEL4BENCH_READ_CCNT(start);
+        write_mapping_fault(address);
+        SEL4BENCH_READ_CCNT(end);
+        results->vm_fault_map[i] = end - start;
+        address += (1 << seL4_PageBits);
+    }
+
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+}
+
+static void measure_vm_fault_map_handler_fn(int argc, char **argv) {
+    seL4_CPtr ep, done_ep, reply, tcb;
+    volatile ccnt_t *start;
+    ccnt_t end;
+    fault_results_t *results;
+    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
+
+    parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
+    seL4_CPtr *caps = (seL4_CPtr *) atol(argv[6]);
+
+    /* signal driver to convert us to passive and block */
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
+    } else {
+        /* wait for first fault */
+        api_recv(ep, NULL, reply);
+    }
+
+    int err;
+    for (int i = 0; i < N_RUNS; i++) {
+        err = seL4_ARCH_Page_Map(caps[i], SEL4UTILS_PD_SLOT, START_ADDR + i * (1 << seL4_PageBits), seL4_AllRights,
+                                seL4_ARCH_Default_VMAttributes);
+        DO_REAL_REPLY_RECV(ep, tag, reply);
+    }
+
+    err = seL4_ARCH_Page_Map(caps[N_RUNS], SEL4UTILS_PD_SLOT, START_ADDR + N_RUNS * (1 << seL4_PageBits), seL4_AllRights,
+                            seL4_ARCH_Default_VMAttributes);
+
+    if (config_set(CONFIG_KERNEL_MCS)) {
+        seL4_Send(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    } else {
+        api_reply(reply, seL4_MessageInfo_new(0, 0, 0, 0));
+    }
+
+    /* tell benchmark we are done and that there are no errors */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ep, NULL);
 }
 
 void run_benchmark(void *faulter_fn, void *handler_fn, seL4_CPtr done_ep)
