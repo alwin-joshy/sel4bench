@@ -21,10 +21,10 @@
 #
 set(RELEASE ON CACHE BOOL "Performance optimized build")
 set(HARDWARE OFF CACHE BOOL "Configuration for sel4bench hardware app")
-set(FAULT OFF CACHE BOOL "Configuration sel4bench fault app")
+set(FAULT ON CACHE BOOL "Configuration sel4bench fault app")
 set(VCPU OFF CACHE BOOL "Whether or not to run the VCPU benchmarks")
 set(SMP OFF CACHE BOOL "Configuration sel4bench smp app")
-set(PLATFORM "x86_64" CACHE STRING "Platform to test")
+set(PLATFORM "odroidc2" CACHE STRING "Platform to test")
 set(FASTPATH ON CACHE BOOL "Turn fastpath on or off")
 set(ARM_HYP OFF CACHE BOOL "ARM EL2 hypervisor features on or off")
 set(MCS OFF CACHE BOOL "MCS kernel")
