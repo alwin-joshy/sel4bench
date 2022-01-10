@@ -21,10 +21,10 @@ static json_t *fault_process(void *results)
     };
 
     /* calculate overhead of reply_recv */
-    result_t result = process_result(N_RUNS, raw_results->reply_recv_overhead, desc);
+    result_t result = process_result(N_RUNS, raw_results->reply_recv_1_overhead, desc);
 
     result_set_t set = {
-        .name = "fault overhead",
+        .name = "fault overhead (undefined instruction fault)",
         .n_results = 1,
         .n_extra_cols = 0,
         .results = &result
@@ -61,11 +61,20 @@ static json_t *fault_process(void *results)
     result = process_result(N_RUNS, raw_results->ccnt_overhead, desc);
     json_array_append_new(array, result_set_to_json(set));
 
+    int ccnt_overhead = result.min;
+
     /* fault to fault handler does not */
     set.name = "fault handler -> faulter";
     desc.stable = false;
-    desc.overhead = result.min;
+    desc.overhead = ccnt_overhead;
     result = process_result(N_RUNS, raw_results->fault_reply, desc);
+    json_array_append_new(array, result_set_to_json(set));
+
+    /* fault to fault handler does not */
+    set.name = "vm fault handler -> faulter";
+    desc.stable = false;
+    desc.overhead = ccnt_overhead;
+    result = process_result(N_RUNS, raw_results->vm_fault_reply, desc);
     json_array_append_new(array, result_set_to_json(set));
 
     return array;
