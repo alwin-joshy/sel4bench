@@ -174,7 +174,6 @@ static void measure_vm_fault_fn(int argc, char **argv) {
     seL4_CPtr done_ep = atol(argv[2]);
 
     for (int i = 0; i < N_RUNS + 1; i++){
-        // ZF_LOGE("Faulter: %d", i);
         SEL4BENCH_READ_CCNT(*start);
         read_fault();
     }
@@ -188,6 +187,7 @@ static void measure_vm_fault_handler_fn(int argc, char **argv) {
     ccnt_t end;
     fault_results_t *results;
     seL4_Word badge = 0;
+    int msg = 0;
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
 
     parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
@@ -205,12 +205,9 @@ static void measure_vm_fault_handler_fn(int argc, char **argv) {
     for (int i = 0; i < N_RUNS; i++) {
         /* Clear MRs to ensure they get repopulated. */
         set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
-        int msg = 0;
         DO_REAL_REPLY_RECV_1(ep, msg, reply);
-        // DO_REAL_REPLY_RECV(ep, tag, reply);
         SEL4BENCH_READ_CCNT(end);
-        results->vm_fault[i] = end - *start;
-        // ZF_LOGE("Handler: %d", i);
+        results->vm_fault[i] = end - *start
         volatile int j;
         for (j = 0; j < 10000; j++) {
 
@@ -255,6 +252,7 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
     ccnt_t end;
     fault_results_t *results;
     seL4_Word badge = 0;
+    int msg = 0;
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
 
     parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
@@ -272,9 +270,7 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
         /* record time */
         SEL4BENCH_READ_CCNT(*start);
         /* wait for fault */
-        int msg = 0;
         DO_REAL_REPLY_RECV_1(ep, msg, reply);
-        // DO_REAL_REPLY_RECV(ep, tag, reply);
     }
 
     set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
