@@ -193,8 +193,6 @@ static void measure_vm_fault_handler_fn(int argc, char **argv)
 
     parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
 
-    seL4_Word junk;
-
     /* signal driver to convert us to passive and block */
     if (config_set(CONFIG_KERNEL_MCS)) {
         api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
@@ -210,10 +208,6 @@ static void measure_vm_fault_handler_fn(int argc, char **argv)
         DO_REAL_REPLY_RECV_1(ep, msg, reply);
         SEL4BENCH_READ_CCNT(end);
         results->vm_fault[i] = end - *start;
-        volatile int j;
-        for (j = 0; j < 10000; j++) {
-
-        }
     }
 
     set_good_magic_and_set_pc(tcb, (seL4_Word)read_fault_restart_address);
@@ -373,10 +367,6 @@ static void measure_fault_roundtrip_fn(int argc, char **argv)
         fault();
         SEL4BENCH_READ_CCNT(end);
         results->round_trip[i] = end - start;
-        volatile int j;
-        for (j = 0; j < 10000; j++) {
-
-        }
     }
     seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
 }
