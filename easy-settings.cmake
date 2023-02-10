@@ -20,10 +20,10 @@
 # ninja
 #
 set(RELEASE ON CACHE BOOL "Performance optimized build")
-set(PLATFORM "x86_64" CACHE STRING "Platform to test")
+set(PLATFORM "odroidc2" CACHE STRING "Platform to test")
 set(FASTPATH ON CACHE BOOL "Turn fastpath on or off")
 set(ARM_HYP OFF CACHE BOOL "ARM EL2 hypervisor features on or off")
-set(MCS OFF CACHE BOOL "MCS kernel")
+set(MCS ON CACHE BOOL "MCS kernel")
 
 # Set the list of benchmark applications to be included into the image
 
@@ -37,7 +37,7 @@ set(FAULT OFF CACHE BOOL "Application to benchmark seL4 faults")
 set(VCPU OFF CACHE BOOL "Application to benchmark seL4 VCPU performance")
 
 # default is OFF
-set(SMP OFF CACHE BOOL "Application SMP benchmarks")
+set(SMP ON CACHE BOOL "Application SMP benchmarks")
 
 # default is ON
 set(IPC ON CACHE BOOL "Application to benchmark seL4 IPC")

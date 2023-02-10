@@ -23,9 +23,12 @@
 #include <arch/signal.h>
 
 #define N_LO_SIGNAL_ARGS 4
-#define N_HI_SIGNAL_ARGS 3
+#define N_HI_SIGNAL_ARGS 4
 #define N_WAIT_ARGS 3
 #define MAX_ARGS 4
+
+#define NOT_SMP 0
+#define SMP 1
 
 typedef struct helper_thread {
     sel4utils_thread_t thread;
@@ -85,21 +88,30 @@ void high_prio_signal_fn(int argc, char **argv)
 {
     assert(argc == N_HI_SIGNAL_ARGS);
     seL4_CPtr ntfn = (seL4_CPtr) atol(argv[0]);
-    signal_results_t *results = (signal_results_t *) atol(argv[1]);
-    seL4_CPtr done_ep = (seL4_CPtr) atol(argv[2]);
+    int smp = (int) atol(argv[1]); 
+    signal_results_t *results = (signal_results_t *) atol(argv[2]);
+    seL4_CPtr done_ep = (seL4_CPtr) atol(argv[3]);
 
     /* first we run a benchmark where we try and read the cycle counter
      * for individual runs - this may not yield a stable result on all platforms
      * due to pipeline, cache etc */
     for (int i = 0; i < N_RUNS; i++) {
         ccnt_t start, end;
+        for (volatile int j = 0; j < 20000000; j++) {
+            
+        }
         COMPILER_MEMORY_FENCE();
         SEL4BENCH_READ_CCNT(start);
         DO_REAL_SIGNAL(ntfn);
         SEL4BENCH_READ_CCNT(end);
         COMPILER_MEMORY_FENCE();
         /* record the result */
-        results->hi_prio_results[i] = (end - start);
+        if (!smp) {
+            results->hi_prio_results[i] = (end - start);
+        } else {
+            // ZF_LOGE("%d", end - start);
+            results->hi_prio_results_smp[i] = (end - start);
+        }
     }
 
     /* now run an average benchmark and read the perf counters as well */
@@ -117,8 +129,13 @@ void high_prio_signal_fn(int argc, char **argv)
                 DO_REAL_SIGNAL(ntfn);
             }
             SEL4BENCH_READ_CCNT(end);
-            sel4bench_read_and_stop_counters(mask, chunk, n_counters, results->hi_prio_average[j]);
-            results->hi_prio_average[j][CYCLE_COUNT_EVENT] = end - start;
+            if (!smp) {
+                sel4bench_read_and_stop_counters(mask, chunk, n_counters, results->hi_prio_average[j]);
+                results->hi_prio_average[j][CYCLE_COUNT_EVENT] = end - start;
+            } else {
+                sel4bench_read_and_stop_counters(mask, chunk, n_counters, results->hi_prio_average_smp[j]);
+                results->hi_prio_average_smp[j][CYCLE_COUNT_EVENT] = end - start;
+            }
             COMPILER_MEMORY_FENCE();
         }
     }
@@ -193,7 +210,7 @@ static void benchmark(env_t *env, seL4_CPtr ep, seL4_CPtr ntfn, signal_results_t
     /* change params for high prio signaller */
     signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn;
     signal.argc = N_HI_SIGNAL_ARGS;
-    sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn,
+    sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn, NOT_SMP,
                                (seL4_Word) results, ep);
 
     start_threads(&wait, &signal);
@@ -201,6 +218,49 @@ static void benchmark(env_t *env, seL4_CPtr ep, seL4_CPtr ntfn, signal_results_t
     benchmark_wait_children(ep, "children of notification", 1);
 
     stop_threads(&wait, &signal);
+
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+
+    ZF_LOGE("Smp benchmark");
+    /* Benchmark cross-core signalling to a lower prio thread */
+    sched_params_t params_signaller = {0};
+    sched_params_t params_waiter = {0};
+#ifdef CONFIG_KERNEL_MCS
+    params_signaller = sched_params_round_robin(params_signaller, &env->simple, 0, CONFIG_BOOT_THREAD_TIME_SLICE * US_IN_MS);
+    params_waiter = sched_params_round_robin(params_waiter, &env->simple, 1, CONFIG_BOOT_THREAD_TIME_SLICE * US_IN_MS);
+#else
+    params_signaller.core = 0;
+    params_waiter.core = 1;
+#endif
+
+    error = sel4utils_set_sched_affinity(&signal.thread, params_signaller);
+    assert(!error);
+    error = sel4utils_set_sched_affinity(&wait.thread, params_waiter);
+    assert(!error);
+
+
+    /* now benchmark signalling to a lower prio thread */
+    error = seL4_TCB_SetPriority(wait.thread.tcb.cptr, auth, seL4_MaxPrio - 1);
+    assert(error == seL4_NoError);
+
+    error = seL4_TCB_SetPriority(signal.thread.tcb.cptr, auth, seL4_MaxPrio);
+    assert(error == seL4_NoError);
+
+    /* set our prio down so the waiting thread can get on the endpoint */
+    seL4_TCB_SetPriority(SEL4UTILS_TCB_SLOT, auth, seL4_MaxPrio - 2);
+
+    /* change params for high prio signaller */
+    signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn;
+    signal.argc = N_HI_SIGNAL_ARGS;
+    sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn, SMP, 
+                               (seL4_Word) results, ep);
+
+    start_threads(&wait, &signal);
+
+    benchmark_wait_children(ep, "children of notification", 1);
+
+    stop_threads(&wait, &signal);
+#endif 
 }
 
 void measure_signal_overhead(seL4_CPtr ntfn, ccnt_t *results)

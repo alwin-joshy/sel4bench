@@ -49,6 +49,18 @@ static json_t *signal_process(void *results)
     json_array_append_new(array, average_counters_to_json("Average signal to low prio thread",
                                                           average_results));
 
+
+    result = process_result(N_RUNS, raw_results->hi_prio_results_smp, desc);
+    set.name = "Signal to low prio thread (SMP)";
+    json_array_append_new(array, result_set_to_json(set));
+
+    process_average_results(N_RUNS, NUM_AVERAGE_EVENTS, raw_results->hi_prio_average_smp, average_results);
+
+    json_array_append_new(array, average_counters_to_json("Average signal to low prio thread (SMP)",
+                                                          average_results));
+
+    ZF_LOGE("hio");
+    
     return array;
 }
 

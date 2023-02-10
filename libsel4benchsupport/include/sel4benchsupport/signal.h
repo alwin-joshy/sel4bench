@@ -16,4 +16,6 @@ typedef struct signal_results {
     ccnt_t hi_prio_results[N_RUNS];
     ccnt_t overhead[N_RUNS];
     ccnt_t hi_prio_average[N_RUNS][NUM_AVERAGE_EVENTS];
+    ccnt_t hi_prio_results_smp[N_RUNS];
+    ccnt_t hi_prio_average_smp[N_RUNS][NUM_AVERAGE_EVENTS];
 } signal_results_t;

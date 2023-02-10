@@ -278,7 +278,7 @@ void *main_continued(void *arg)
         sync_benchmark_new(),
         /* add new benchmarks here */
         page_mapping_benchmark_new(),
-        smp_benchmark_new(),
+        // smp_benchmark_new(),
         vcpu_benchmark_new(),
 
         /* null terminator */
