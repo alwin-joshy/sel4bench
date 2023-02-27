@@ -153,17 +153,6 @@ static void inline map_pages(seL4_Word addr, seL4_CPtr page_cap, int npage)
 PROT_UNPROT_NPAGE(prot_pages, seL4_CanRead)
 PROT_UNPROT_NPAGE(unprot_pages, seL4_AllRights)
 
-static seL4_Word inline map_pages2(seL4_Word addr, seL4_CPtr page_cap, int npage){
-    long err UNUSED;
-    for (int i = 0; i < npage; i++) {
-        err = seL4_ARM_VSpace_Page_Map(SEL4UTILS_PD_SLOT, page_cap, addr,
-                                 seL4_AllRights, seL4_ARCH_Default_VMAttributes);
-        assert(err == 0);
-        page_cap++;
-        addr += PAGE_SIZE_4K;
-    }
-}
-
 /* Benchmark Child Process */
 static void
 bench_proc(int argc UNUSED, char *argv[])
@@ -178,7 +167,9 @@ bench_proc(int argc UNUSED, char *argv[])
 
     sel4bench_init();
 
+    /* Store cptrs to mapping structures */
     seL4_CPtr pt_ptr_start = free_slot;
+
     /* Install page tables to avoid mapping to fail */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
@@ -189,8 +180,10 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
+    /* Store cptrs to the frame caps */
     seL4_CPtr page_ptr_start = free_slot;
-    /* allocate pages */
+
+    /* allocate frames */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
 
@@ -200,7 +193,7 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-    /* Do the real mapping */
+    /* Map the frames to a region of memory */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
 
@@ -210,24 +203,20 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-    /* Set up page table for map2 benchmark*/
+#ifdef CONFIG_ARCH_AARCH64
+    /* Save cptr to the start of the mapping structures for the second region */
     seL4_CPtr map2_pt_ptr_start = free_slot;
+
+    /* Set up page table for map2 benchmark*/
     prepare_page_table(addr2, npage, untyped, &free_slot);
 
+    /* Store cptrs to the frame caps */
     seL4_CPtr map2_ptr_start = free_slot;
     prepare_pages(npage, untyped, &free_slot);
 
-    /* Mapping with the new one */
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-
-#ifdef CONFIG_ARCH_AARCH64
-    map_pages2(addr2, map2_ptr_start, npage);
+    /* Map the frames to the second region of memory */
+    map_pages(addr2, map2_ptr_start, npage);
 #endif 
-
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
 
     /* Protect mapped page as seL4_CanRead one by one */
     COMPILER_MEMORY_FENCE();
@@ -247,10 +236,10 @@ bench_proc(int argc UNUSED, char *argv[])
     SEL4BENCH_READ_CCNT(start);
     
 #ifdef CONFIG_ARCH_AARCH64
-    while (start_range < end_addr) {
-        seL4_ARM_VSpace_Range_Protect_t remap_ret = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_CanRead);
+    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 32) {
+        seL4_ARM_VSpace_Remap_Range_t remap_ret = seL4_ARM_VSpace_Remap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 32), seL4_CanRead);
         assert(remap_ret.error == 0);
-        start_range = remap_ret.next_vaddr;
+        assert(remap_ret.num_remapped == 32);
     }
 #endif 
 
@@ -271,87 +260,6 @@ bench_proc(int argc UNUSED, char *argv[])
     /* cleaning the original mapping*/
     start_range = addr; 
     end_addr = start_range + npage * PAGE_SIZE_4K;
-
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-
-#ifdef CONFIG_ARCH_AARCH64
-    while (start_range < end_addr) {
-        seL4_ARM_VSpace_Range_Protect_t remap_ret = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_AllRights);
-        assert(remap_ret.error == 0);
-        start_range = remap_ret.next_vaddr;
-    }
-#endif
-
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
-    /* Cleaning up the map2 mappings */
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-    for (int i = 0; i < npage; i++) {
-        long err = seL4_ARCH_Page_Unmap(map2_ptr_start + i);
-        ZF_LOGF_IFERR(err, "ummap page failed\n");
-    }
-
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
-    /* Setup for testing new mapping operation*/ 
-
-    for (int i = 0; i < npage; i++) {
-        long err = seL4_ARCH_Page_Map(map2_ptr_start + i, SEL4UTILS_PD_SLOT, addr + i * PAGE_SIZE_4K,
-                                 seL4_AllRights, seL4_ARCH_Default_VMAttributes);
-        assert(err == 0);
-    }
-
-    start_range = addr; 
-    end_addr = start_range + npage * PAGE_SIZE_4K;
-
-    /* Unmap the range with range remap to leave some stale caps*/
-#ifdef CONFIG_ARCH_AARCH64
-    while (start_range < end_addr) {
-        seL4_ARM_VSpace_Range_Protect_t remap_ret = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_AllRights);
-        assert(remap_ret.error == 0);
-        start_range = remap_ret.next_vaddr;
-    }
-#endif
-
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-    for (int i = 0; i < npage; i++) {
-        seL4_ARCH_Page_Unmap(map2_ptr_start + i);
-        seL4_ARCH_Page_Map(map2_ptr_start + i, SEL4UTILS_PD_SLOT, addr2 + i * PAGE_SIZE_4K, seL4_AllRights, seL4_ARCH_Default_VMAttributes);
-    }
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
-    start_range = addr2; 
-    end_addr = start_range + npage * PAGE_SIZE_4K;
-
-    /* Unmap the range with range remap to leave some stale caps*/
-#ifdef CONFIG_ARCH_AARCH64
-    while (start_range < end_addr) {
-        seL4_ARM_VSpace_Range_Protect_t remap_ret = seL4_ARM_VSpace_Range_Protect(SEL4UTILS_PD_SLOT, start_range, end_addr, seL4_AllRights);
-        assert(remap_ret.error == 0);
-        start_range = remap_ret.next_vaddr;
-    }
-#endif
-
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-#ifdef CONFIG_ARCH_AARCH64
-    for (int i = 0; i < npage; i++) {
-        seL4_ARM_VSpace_Page_Map(SEL4UTILS_PD_SLOT, map2_ptr_start + i, addr + i * PAGE_SIZE_4K, seL4_AllRights, seL4_ARCH_Default_VMAttributes);
-    }
-#endif
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
     /* Cleaning up the mappings before the next run */
     for (int i = 0; i < npage; i++) {
         long err = seL4_ARCH_Page_Unmap(map2_ptr_start + i);
