@@ -280,6 +280,7 @@ void *main_continued(void *arg)
         page_mapping_benchmark_new(),
         smp_benchmark_new(),
         vcpu_benchmark_new(),
+        dummy_benchmark_new(),
 
         /* null terminator */
         NULL
@@ -288,6 +289,8 @@ void *main_continued(void *arg)
     json_t *output = json_array();
     assert(output != NULL);
     int error;
+
+    printf("dummy: %d\n", config_set(CONFIG_APP_DUMMYBENCH));
 
     /* run the benchmarks */
     for (int i = 0; benchmarks[i] != NULL; i++) {

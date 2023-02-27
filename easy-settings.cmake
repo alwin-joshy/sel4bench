@@ -20,7 +20,7 @@
 # ninja
 #
 set(RELEASE ON CACHE BOOL "Performance optimized build")
-set(PLATFORM "x86_64" CACHE STRING "Platform to test")
+set(PLATFORM "odroidc2" CACHE STRING "Platform to test")
 set(FASTPATH ON CACHE BOOL "Turn fastpath on or off")
 set(ARM_HYP OFF CACHE BOOL "ARM EL2 hypervisor features on or off")
 set(MCS OFF CACHE BOOL "MCS kernel")
@@ -31,7 +31,7 @@ set(MCS OFF CACHE BOOL "MCS kernel")
 set(HARDWARE OFF CACHE BOOL "Application to benchmark hardware-related operations")
 
 # default is OFF
-set(FAULT OFF CACHE BOOL "Application to benchmark seL4 faults")
+set(FAULT ON CACHE BOOL "Application to benchmark seL4 faults")
 
 # default is OFF
 set(VCPU OFF CACHE BOOL "Application to benchmark seL4 VCPU performance")
@@ -60,3 +60,6 @@ set(MAPPING ON CACHE BOOL "Application to benchmark seL4 mapping a series of pag
 
 # default is ON
 set(SYNC ON CACHE BOOL "Application to benchmark seL4 sync")
+
+# default is ON
+set(DUMMY ON CACHE BOOL "Dummy benchmark")
