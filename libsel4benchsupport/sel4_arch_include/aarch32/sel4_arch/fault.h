@@ -22,6 +22,7 @@
     ip = mr0; \
 } while(0)
 
+
 #else
 #define DO_REPLY_RECV_1(ep, ip, ro, swi) do { \
     register seL4_Word src asm("r0") = (seL4_Word)ep; \
@@ -35,7 +36,6 @@
     ); \
     ip = mr0; \
 } while(0)
-
 #endif /* CONFIG_KERNEL_MCS */
 
 #define DO_REAL_REPLY_RECV_1(ep, mr0, ro) DO_REPLY_RECV_1(ep, mr0, ro, "swi $0")

@@ -306,10 +306,12 @@ static void measure_fault_handler_fn(int argc, char **argv)
     fault_results_t *results;
 
     parse_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
+
     seL4_Word ip = fault_handler_start(ep, done_ep, reply);
     for (int i = 0; i < N_RUNS; i++) {
         ip += UD_INSTRUCTION_SIZE;
         DO_REAL_REPLY_RECV_1(ep, ip, reply);
+
         SEL4BENCH_READ_CCNT(end);
         results->fault[i] = end - *start;
     }
@@ -571,6 +573,7 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
 
     /* create faulter */
     ccnt_t start = 0;
+
     benchmark_configure_thread(env, fault_endpoint.cptr, seL4_MinPrio + 1, "faulter", &faulter);
     sel4utils_create_word_args(faulter_args, faulter_argv, N_FAULTER_ARGS, (seL4_Word) &start,
                                (seL4_Word) results, done_ep.cptr);

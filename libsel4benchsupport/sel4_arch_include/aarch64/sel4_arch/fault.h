@@ -22,6 +22,7 @@
     ip = mr0; \
 } while(0)
 
+
 #else
 #define DO_REPLY_RECV_1(ep, ip, ro, swi) do { \
     register seL4_Word src asm("x0") = (seL4_Word)ep; \
