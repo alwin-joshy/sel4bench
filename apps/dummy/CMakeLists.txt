@@ -29,7 +29,7 @@ endif()
 target_link_libraries(
     dummy
     sel4_autoconf
-    sel4benchfault_Config
+    sel4benchdummy_Config
     sel4
     sel4bench
     muslc

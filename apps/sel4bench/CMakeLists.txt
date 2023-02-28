@@ -107,6 +107,7 @@ if(Sel4Bench)
         smp_Config
         sel4benchsync_Config
         sel4benchvcpu_Config
+        sel4benchdummy_Config
     )
     include(rootserver)
     DeclareRootserver(sel4benchapp)

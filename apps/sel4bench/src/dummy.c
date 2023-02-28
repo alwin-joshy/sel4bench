@@ -35,8 +35,7 @@ static json_t *dummy_process(void *results) {
 
 static benchmark_t dummy_benchmark = {
 	.name = "dummy",
-	.enabled = true,
-	// .enabled = config_set(CONFIG_APP_DUMMYBENCH),
+	.enabled = config_set(CONFIG_APP_DUMMYBENCH),
 	.results_pages = BYTES_TO_SIZE_BITS_PAGES(sizeof(dummy_results_t), seL4_PageBits),
 	.process = dummy_process,
 	.init = blank_init

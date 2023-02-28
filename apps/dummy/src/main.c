@@ -1,6 +1,6 @@
 
 #include <autoconf.h>
-#include <sel4benchfault/gen_config.h>
+#include <sel4benchdummy/gen_config.h>
 #include <stdio.h>
 
 #include <sel4/sel4.h>

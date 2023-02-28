@@ -14,6 +14,7 @@
 #include <sel4benchpagemapping/gen_config.h>
 #include <sel4benchscheduler/gen_config.h>
 #include <sel4benchsignal/gen_config.h>
+#include <sel4benchdummy/gen_config.h>
 #include <smp/gen_config.h>
 #include <sel4benchsync/gen_config.h>
 #include <sel4benchvcpu/gen_config.h>
