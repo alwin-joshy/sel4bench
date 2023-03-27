@@ -24,8 +24,9 @@
 
 #define N_LO_SIGNAL_ARGS 4
 #define N_HI_SIGNAL_ARGS 3
-#define N_WAIT_ARGS 3
-#define MAX_ARGS 4
+#define N_HI_SIGNAL2_ARGS 5
+#define N_WAIT_ARGS 4
+#define MAX_ARGS 5
 
 typedef struct helper_thread {
     sel4utils_thread_t thread;
@@ -47,10 +48,11 @@ void wait_fn(int argc, char **argv)
     seL4_CPtr ntfn = (seL4_CPtr) atol(argv[0]);
     seL4_CPtr done_ep = (seL4_CPtr) atol(argv[1]);
     volatile ccnt_t *end = (volatile ccnt_t *) atol(argv[2]);
-
+    seL4_CPtr ntfn2 = (seL4_CPtr) atol(argv[3]);
     for (int i = 0; i < N_RUNS; i++) {
         DO_REAL_WAIT(ntfn);
         SEL4BENCH_READ_CCNT(*end);
+        DO_REAL_SIGNAL(ntfn2);
     }
 
     /* signal completion */
@@ -58,6 +60,34 @@ void wait_fn(int argc, char **argv)
     /* block */
     seL4_Wait(ntfn, NULL);
 }
+
+
+void wait_fn2(int argc, char **argv)
+{
+    printf("hiii\n");
+    assert(argc == N_WAIT_ARGS);
+    seL4_CPtr ntfn = (seL4_CPtr) atol(argv[0]);
+    seL4_CPtr done_ep = (seL4_CPtr) atol(argv[1]);
+    volatile ccnt_t *end = (volatile ccnt_t *) atol(argv[2]);
+    seL4_CPtr ntfn2 = (seL4_CPtr) atol(argv[3]);
+    
+    printf("waiter: waiting\n");
+    DO_REAL_WAIT(ntfn);
+    printf("waiter: done waiting\n");
+    for (int i = 0; i < N_RUNS; i++) {
+        SEL4BENCH_READ_CCNT(*end);
+        printf("waiter: waiting and sending\n");
+        seL4_NBSendWait(ntfn2, seL4_MessageInfo_new(0, 0, 0, 0), ntfn, NULL);
+        printf("waiter: done waiting and sending\n");
+        // DO_REAL_SIGNAL(ntfn2);
+    }
+
+    /* signal completion */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ntfn, NULL);
+}
+
 
 /* this signal function expects to switch threads (ie wait_fn is higher prio) */
 void low_prio_signal_fn(int argc, char **argv)
@@ -80,6 +110,48 @@ void low_prio_signal_fn(int argc, char **argv)
     /* block */
     seL4_Wait(ntfn, NULL);
 }
+
+void high_prio_signal_fn2(int argc, char **argv)
+{
+    // assert(argc == N_HI_SIGNAL2_ARGS);
+    seL4_CPtr ntfn = (seL4_CPtr) atol(argv[0]);
+    signal_results_t *results = (signal_results_t *) atol(argv[1]);
+    seL4_CPtr done_ep = (seL4_CPtr) atol(argv[2]);
+    volatile ccnt_t *end = (volatile ccnt_t *) atol(argv[3]);
+    seL4_CPtr ntfn2 = (seL4_CPtr) atol(argv[4]);
+
+
+    // volatile ccnt_t *end = (volatile ccnt_t *) atol(argv[1]);
+    // signal_results_t *results = (signal_results_t *) atol(argv[2]);
+    // seL4_CPtr done_ep = (seL4_CPtr) atol(argv[3]);
+    // seL4_CPtr ntfn2 = (seL4_CPtr) atol(argv[4]);
+
+
+
+    for (int i = 0; i < N_RUNS; i++) {
+        ccnt_t start;
+        ccnt_t start2, end2; 
+        printf("singaler: Signalling\n");
+        SEL4BENCH_READ_CCNT(start);
+        DO_REAL_SIGNAL(ntfn);
+        SEL4BENCH_READ_CCNT(end2);
+        // SEL4BENCH_READ_CCNT(start2);
+        // printf("singaler: waiting\n");
+        DO_REAL_WAIT(ntfn2);
+        // printf("singaler: done waiting\n");
+        printf("%lu\n", (end2 - start));
+        results->hi_prio_results[i] = (end2 - start);
+
+        // printf("%lu\n", (*end - start - (*end - start2)));
+        // results->hi_prio_results[i] = (*end - start - (*end - start2));
+    }
+
+    /* signal completion */
+    seL4_Send(done_ep, seL4_MessageInfo_new(0, 0, 0, 0));
+    /* block */
+    seL4_Wait(ntfn, NULL);
+}
+
 
 void high_prio_signal_fn(int argc, char **argv)
 {
@@ -165,12 +237,17 @@ static void benchmark(env_t *env, seL4_CPtr ep, seL4_CPtr ntfn, signal_results_t
 
     assert(N_LO_SIGNAL_ARGS >= N_HI_SIGNAL_ARGS);
 
+    vka_object_t ntfn2;
+    error = vka_alloc_notification(&env->slab_vka, &ntfn2);
+    assert(error == seL4_NoError);
+
     /* first benchmark signalling to a higher prio thread */
+    printf("Signalling to higher prio\n");
     benchmark_configure_thread(env, ep, seL4_MaxPrio, "wait", &wait.thread);
     benchmark_configure_thread(env, ep, seL4_MaxPrio - 1, "signal", &signal.thread);
 
-    sel4utils_create_word_args(wait.argv_strings, wait.argv, wait.argc, ntfn, ep, (seL4_Word) &end);
-    sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn,
+    sel4utils_create_word_args(wait.argv_strings, wait.argv, wait.argc, ntfn, ep, (seL4_Word) &end, ntfn2.cptr);
+    sel4utils_create_word_args(signal.argv_strings, signal.argv, N_LO_SIGNAL_ARGS, ntfn,
                                (seL4_Word) &end, (seL4_Word) results->lo_prio_results, ep);
 
     start_threads(&signal, &wait);
@@ -181,6 +258,7 @@ static void benchmark(env_t *env, seL4_CPtr ep, seL4_CPtr ntfn, signal_results_t
 
     seL4_CPtr auth = simple_get_tcb(&env->simple);
     /* now benchmark signalling to a lower prio thread */
+    printf("Signalling to lower prio\n");
     error = seL4_TCB_SetPriority(wait.thread.tcb.cptr, auth, seL4_MaxPrio - 1);
     assert(error == seL4_NoError);
 
@@ -191,16 +269,43 @@ static void benchmark(env_t *env, seL4_CPtr ep, seL4_CPtr ntfn, signal_results_t
     seL4_TCB_SetPriority(SEL4UTILS_TCB_SLOT, auth, seL4_MaxPrio - 2);
 
     /* change params for high prio signaller */
-    signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn;
-    signal.argc = N_HI_SIGNAL_ARGS;
+    // signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn;
+    // signal.argc = N_HI_SIGNAL_ARGS;
+    // sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn,
+                               // (seL4_Word) results, ep);
+
+    // // seL4_TCB_BindNotification(signal.thread.tcb.cptr, ntfn);
+
+    // start_threads(&wait, &signal);
+
+    // benchmark_wait_children(ep, "children of notification", 1);
+
+    // stop_threads(&wait, &signal);
+
+    // signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn2;
+    // signal.argc = N_HI_SIGNAL_ARGS + 2;
+    // sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn,
+    //                            (seL4_Word) results, ep, (seL4_Word) &end,  ntfn2.cptr);
+
+    vka_free_object(&env->slab_vka, &ntfn2);
+    error = vka_alloc_notification(&env->slab_vka, &ntfn2);
+    assert(error == seL4_NoError);
+
+    /* Now do the same thing but force the high prio thread to yield between eveny iteration*/
+    wait.fn = (sel4utils_thread_entry_fn) wait_fn2;
+    sel4utils_create_word_args(wait.argv_strings, wait.argv, wait.argc, ntfn, ep, (seL4_Word) &end, ntfn2.cptr);
+
+    signal.fn = (sel4utils_thread_entry_fn) high_prio_signal_fn2;
+    signal.argc = N_HI_SIGNAL_ARGS + 2;
     sel4utils_create_word_args(signal.argv_strings, signal.argv, signal.argc, ntfn,
-                               (seL4_Word) results, ep);
+                               (seL4_Word) results, ep, (seL4_Word) &end,  ntfn2.cptr);
+
 
     start_threads(&wait, &signal);
 
     benchmark_wait_children(ep, "children of notification", 1);
 
-    stop_threads(&wait, &signal);
+    // stop_threads(&wait, &signal);
 }
 
 void measure_signal_overhead(seL4_CPtr ntfn, ccnt_t *results)
@@ -226,7 +331,7 @@ void CONSTRUCTOR(MUSLCSYS_WITH_VSYSCALL_PRIORITY) init_env(void)
         [seL4_SchedContextObject] = 2,
         [seL4_ReplyObject] = 2,
 #endif
-        [seL4_NotificationObject] = 1,
+        [seL4_NotificationObject] = 2,
     };
 
     env = benchmark_get_env(
