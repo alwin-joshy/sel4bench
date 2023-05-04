@@ -9,7 +9,7 @@
 #include <sel4bench/sel4bench.h>
 #include <sel4utils/process.h>
 
-#define RUNS 16
+#define RUNS 100
 #define TESTS ARRAY_SIZE(page_mapping_benchmark_params)
 #define NPHASE ARRAY_SIZE(phase_name)
 
@@ -79,8 +79,8 @@ char *phase_name[] = {
     "Protect Pages one by one as Read Only",
     "Protect Pages in range as Read Only",
     "Unprotect Pages",
-    // "Unmap Pages using range_unmap",
-    // "Unmap pages one by one with page_unmap",
+    "Unmap pages one by one with page_unmap",
+    "Unmap Pages using range_unmap",
     // "Reuse stale caps with unmap + page_map",
     // "Reuse stale caps with vspace_page_map"
 };

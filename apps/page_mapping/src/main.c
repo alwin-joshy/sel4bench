@@ -236,10 +236,12 @@ bench_proc(int argc UNUSED, char *argv[])
     SEL4BENCH_READ_CCNT(start);
     
 #ifdef CONFIG_ARCH_AARCH64
-    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 32) {
-        seL4_ARM_VSpace_Remap_Range_t remap_ret = seL4_ARM_VSpace_Remap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 32), seL4_CanRead);
+    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 512) {
+        seL4_ARM_VSpace_Remap_Range_t remap_ret = seL4_ARM_VSpace_Remap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 512), seL4_CanRead);
         assert(remap_ret.error == 0);
-        assert(remap_ret.num_remapped == 32);
+        assert(remap_ret.remapped == 512 /*(-1U) >> (512 - MIN(npage, 512))*/ );
+        // ZF_LOGE("%lx", remap_ret.remapped);
+
     }
 #endif 
 
@@ -257,28 +259,42 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-    /* cleaning the original mapping*/
-    start_range = addr; 
-    end_addr = start_range + npage * PAGE_SIZE_4K;
-    /* Cleaning up the mappings before the next run */
+    COMPILER_MEMORY_FENCE();
+    SEL4BENCH_READ_CCNT(start);
+
+    /* Cleaning up the mappings one by one before the next run */
     for (int i = 0; i < npage; i++) {
-        long err = seL4_ARCH_Page_Unmap(map2_ptr_start + i);
-        ZF_LOGF_IFERR(err, "ummap page failed\n");
-        err = seL4_ARCH_Page_Unmap(page_ptr_start + i);
+        long err = seL4_ARCH_Page_Unmap(page_ptr_start + i);
         ZF_LOGF_IFERR(err, "ummap page failed\n");
     }
 
+    SEL4BENCH_READ_CCNT(end);
+    COMPILER_MEMORY_FENCE();
+    send_result(result_ep, end - start);
+
+    COMPILER_MEMORY_FENCE();
+    SEL4BENCH_READ_CCNT(start);
+    
+    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 512) {
+        seL4_ARM_VSpace_Unmap_Range_t unmap_ret = seL4_ARM_VSpace_Unmap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 512));
+        ZF_LOGF_IFERR(unmap_ret.error, "ummap range failed\n");
+        assert(unmap_ret.unmapped == 512 /*(-1U) >> (512 - MIN(npage, 512))*/);
+    }
+
+    SEL4BENCH_READ_CCNT(end);
+    COMPILER_MEMORY_FENCE();
+    send_result(result_ep, end - start);
 
 #ifdef CONFIG_ARM_AARCH64
-for (int i = pt_ptr_start; i < page_ptr_start; i++) {
-    int err = seL4_ARM_PageUpperDirectory_Unmap(i);
-    if (err) {
-        err = seL4_ARM_PageDirectory_Unmap(i);
+    for (int i = pt_ptr_start; i < page_ptr_start; i++) {
+        int err = seL4_ARM_PageUpperDirectory_Unmap(i);
         if (err) {
-            err = seL4_ARM_PageTable_Unmap(i);
+            err = seL4_ARM_PageDirectory_Unmap(i);
+            if (err) {
+                err = seL4_ARM_PageTable_Unmap(i);
+            }
         }
     }
-}
     #endif
 
 #ifdef CONFIG_ARCH_AARCH64
@@ -386,6 +402,20 @@ int main(int argc, char *argv[])
                                                     result_ep_path);
 
     measure_overhead(results);
+
+    /* Warmup */
+    proc.untyped = sel4utils_copy_path_to_process(&proc.process,
+                                                  untyped_path);
+    proc.npage = 16;
+    sel4utils_create_word_args(proc.argv_strings, proc.argv, NUM_ARGS,
+                               proc.result_ep, proc.untyped, proc.npage);
+    ccnt_t ret_time[NPHASE] = {0};
+    run_bench_child_proc(env, &result_ep_path, ret_time, &proc);
+    vka_cnode_revoke(&untyped_path);
+    proc.process.cspace_next_free--;
+    seL4_TCB_Suspend(proc.process.thread.tcb.cptr);
+
+
     for (int i = 0; i < RUNS; i++) {
         /* Reduced from max 2048 pages to 1024 because we are not given enough memory*/
         for (int j = 0; j < TESTS - 1; j++) {
