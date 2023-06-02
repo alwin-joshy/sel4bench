@@ -44,11 +44,6 @@ static json_t *fault_process(void *results)
     result = process_result(N_RUNS, raw_results->fault, desc);
     json_array_append_new(array, result_set_to_json(set));
 
-
-    set.name = "vm fault + mapping round trip";
-    result = process_result(N_RUNS, raw_results->vm_fault_map, desc);
-    json_array_append_new(array, result_set_to_json(set));
-
     set.name = "vm faulter -> fault handler";
     result = process_result(N_RUNS, raw_results->vm_fault, desc);
     json_array_append_new(array, result_set_to_json(set));
