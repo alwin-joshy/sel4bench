@@ -194,7 +194,8 @@ static inline void vm_fault_handler_done(seL4_CPtr ep, seL4_CPtr tcb, seL4_CPtr 
     seL4_Wait(ep, NULL);
 }
 
-static inline void vm_fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL4_CPtr reply) {
+static inline void vm_fault_handler_start(seL4_CPtr ep, seL4_CPtr done_ep, seL4_CPtr reply)
+{
     if (config_set(CONFIG_KERNEL_MCS)) {
         api_nbsend_recv(done_ep, seL4_MessageInfo_new(0, 0, 0, 0), ep, NULL, reply);
     } else {
@@ -567,7 +568,7 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
     results->fault_reply_ep_min_overhead = getMinOverhead(results->ccnt_overhead, N_RUNS);
     run_benchmark(measure_fault_reply_fn_ep, measure_fault_reply_handler_fn, done_ep.cptr,
                   N_HANDLER_ARGS, handler_argv);
-    
+
     /* benchmark round_trip */
     run_benchmark(measure_fault_roundtrip_fn, measure_fault_roundtrip_handler_fn, done_ep.cptr,
                   N_HANDLER_ARGS, handler_argv);
@@ -576,7 +577,7 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
     results->round_trip_ep_min_overhead = getMinOverhead(results->reply_recv_overhead, N_RUNS);
     run_benchmark(measure_fault_roundtrip_fn_ep, measure_fault_roundtrip_handler_fn, done_ep.cptr,
                   N_HANDLER_ARGS, handler_argv);
-    
+
     /* benchmark vm fault */
     run_benchmark(measure_vm_fault_fn, measure_vm_fault_handler_fn, done_ep.cptr,
                   N_VM_HANDLER_ARGS, vm_handler_argv);
