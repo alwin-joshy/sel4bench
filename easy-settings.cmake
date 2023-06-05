@@ -26,6 +26,7 @@ set(ARM_HYP OFF CACHE BOOL "ARM EL2 hypervisor features on or off")
 set(MCS OFF CACHE BOOL "MCS kernel")
 
 # Set the list of benchmark applications to be included into the image
+# Add any new benchmark applications to this list
 
 # default is OFF
 set(HARDWARE OFF CACHE BOOL "Application to benchmark hardware-related operations")
@@ -60,3 +61,7 @@ set(MAPPING ON CACHE BOOL "Application to benchmark seL4 mapping a series of pag
 
 # default is ON
 set(SYNC ON CACHE BOOL "Application to benchmark seL4 sync")
+
+# Allow Early Processing methodology for
+#Signal/"Signal to High Prio Thread" benchmark
+#set(AppSignalEarlyProcessing ON)

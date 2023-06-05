@@ -40,10 +40,20 @@ static json_t *fault_process(void *results)
     result = process_result(N_RUNS, raw_results->round_trip, desc);
     json_array_append_new(array, result_set_to_json(set));
 
+    set.name = "fault round trip (early processing)";
+    result = process_result_early_proc(raw_results->round_trip_ep_num, raw_results->round_trip_ep_sum,
+                                       raw_results->round_trip_ep_sum2, raw_results->round_trip_ep);
+    json_array_append_new(array, result_set_to_json(set));
+
     set.name = "faulter -> fault handler";
     result = process_result(N_RUNS, raw_results->fault, desc);
     json_array_append_new(array, result_set_to_json(set));
 
+    set.name = "faulter -> fault handler (early processing)";
+    result = process_result_early_proc(raw_results->fault_ep_num, raw_results->fault_ep_sum,
+                                       raw_results->fault_ep_sum2, raw_results->fault_ep);
+    json_array_append_new(array, result_set_to_json(set));
+  
     set.name = "vm faulter -> fault handler";
     result = process_result(N_RUNS, raw_results->vm_fault, desc);
     json_array_append_new(array, result_set_to_json(set));
@@ -65,11 +75,13 @@ static json_t *fault_process(void *results)
     desc.overhead = ccnt_overhead;
     result = process_result(N_RUNS, raw_results->fault_reply, desc);
     json_array_append_new(array, result_set_to_json(set));
-
-    /* fault to fault handler does not */
+  
+    set.name = "fault handler -> faulter (early processing)";
+    result = process_result_early_proc(raw_results->fault_reply_ep_num, raw_results->fault_reply_ep_sum,
+                                       raw_results->fault_reply_ep_sum2, raw_results->fault_reply_ep);
+    json_array_append_new(array, result_set_to_json(set));
+  
     set.name = "vm fault handler -> faulter";
-    desc.stable = false;
-    desc.overhead = ccnt_overhead;
     result = process_result(N_RUNS, raw_results->vm_fault_reply, desc);
     json_array_append_new(array, result_set_to_json(set));
 

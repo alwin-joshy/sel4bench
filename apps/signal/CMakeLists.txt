@@ -18,6 +18,7 @@ config_option(
     DEPENDS
     "DefaultBenchDeps"
 )
+
 add_config_library(sel4benchsignal "${configure_string}")
 
 file(GLOB deps src/*.c)
