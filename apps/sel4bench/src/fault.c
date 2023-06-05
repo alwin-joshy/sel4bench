@@ -54,6 +54,16 @@ static json_t *fault_process(void *results)
                                        raw_results->fault_ep_sum2, raw_results->fault_ep);
     json_array_append_new(array, result_set_to_json(set));
 
+    /* Get the overhead for VM faults */
+    set.name = "fault overhead (vm fault)";
+    desc.stable = true;
+    desc.overhead = 0;
+    result = process_result(N_RUNS, raw_results->reply_0_recv_4_overhead, desc);
+    json_array_append_new(array, result_set_to_json(set));
+
+    desc.stable = false;
+    desc.overhead = result.min;
+
     set.name = "vm faulter -> fault handler";
     result = process_result(N_RUNS, raw_results->vm_fault, desc);
     json_array_append_new(array, result_set_to_json(set));

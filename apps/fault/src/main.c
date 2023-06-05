@@ -420,6 +420,7 @@ static void measure_vm_fault_handler_fn(int argc, char **argv)
     volatile ccnt_t *start;
     ccnt_t end;
     fault_results_t *results;
+    seL4_Word m0 = 0, m1 = 0, m2 = 0, m3 = 0;
 
     parse_vm_handler_args(argc, argv, &ep, &start, &results, &done_ep, &reply, &tcb);
 
@@ -427,9 +428,8 @@ static void measure_vm_fault_handler_fn(int argc, char **argv)
     vm_fault_handler_start(ep, done_ep, reply);
 
     for (int i = 0; i < N_RUNS; i++) {
-        int msg = 0;
         set_pc(tcb, (seL4_Word)read_fault_restart_address);
-        DO_REAL_REPLY_RECV_1(ep, msg, reply);
+        DO_REAL_REPLY_0_RECV_4(ep, m0, m1, m2, m3, reply);
         SEL4BENCH_READ_CCNT(end);
         results->vm_fault[i] = end - *start;
     }
@@ -467,7 +467,7 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
     seL4_CPtr ep, done_ep, reply, tcb;
     volatile ccnt_t *start;
     fault_results_t *results;
-    int msg = 0;
+    seL4_Word m0 = 0, m1 = 0, m2 = 0, m3 = 0;
 
     parse_vm_handler_args(argc, argv, &ep, &start, &results /*&end*/, &done_ep, &reply, &tcb);
 
@@ -479,7 +479,7 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
         /* record time */
         SEL4BENCH_READ_CCNT(*start);
         /* wait for fault */
-        DO_REAL_REPLY_RECV_1(ep, msg, reply);
+        DO_REAL_REPLY_0_RECV_4(ep, m0, m1, m2, m3, reply);
     }
 
     vm_fault_handler_done(ep, tcb, done_ep, reply);
@@ -487,7 +487,7 @@ static void measure_vm_fault_reply_handler_fn(int argc, char **argv)
 
 /* Benchmarking infrastructure */
 
-void run_benchmark(void *faulter_fn, void *handler_fn, seL4_CPtr done_ep, int argc, void *argv)
+void run_benchmark(void *faulter_fn, void *handler_fn, seL4_CPtr done_ep, seL4_Word argc, void *argv)
 {
     int error = sel4utils_start_thread(&fault_handler, (sel4utils_thread_entry_fn) handler_fn,
                                        (void *) argc, argv, true);
@@ -556,7 +556,7 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
                   N_HANDLER_ARGS, handler_argv);
 
     /* benchmark fault early processing */
-    results->fault_ep_min_overhead = getMinOverhead(results->reply_recv_overhead, N_RUNS);
+    results->fault_ep_min_overhead = getMinOverhead(results->reply_recv_1_overhead, N_RUNS);
     run_benchmark(measure_fault_fn, measure_fault_handler_fn_ep, done_ep.cptr,
                   N_HANDLER_ARGS, handler_argv);
 
@@ -574,7 +574,7 @@ static void run_fault_benchmark(env_t *env, fault_results_t *results)
                   N_HANDLER_ARGS, handler_argv);
 
     /* benchmark round_trip early processing */
-    results->round_trip_ep_min_overhead = getMinOverhead(results->reply_recv_overhead, N_RUNS);
+    results->round_trip_ep_min_overhead = getMinOverhead(results->reply_recv_1_overhead, N_RUNS);
     run_benchmark(measure_fault_roundtrip_fn_ep, measure_fault_roundtrip_handler_fn, done_ep.cptr,
                   N_HANDLER_ARGS, handler_argv);
 
@@ -591,7 +591,7 @@ void measure_overhead(fault_results_t *results)
 {
     ccnt_t start, end;
     seL4_CPtr ep = 0;
-    UNUSED seL4_Word mr0 = 0;
+    UNUSED seL4_Word mr0 = 0, mr1 = 0, mr2 = 0, mr3 = 0;
     UNUSED seL4_CPtr reply = 0;
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
 
@@ -601,6 +601,13 @@ void measure_overhead(fault_results_t *results)
         DO_NOP_REPLY_RECV_1(ep, mr0, reply);
         SEL4BENCH_READ_CCNT(end);
         results->reply_recv_1_overhead[i] = (end - start);
+    }
+
+    for (int i = 0; i < N_RUNS; i++) {
+        SEL4BENCH_READ_CCNT(start)
+        DO_NOP_REPLY_0_RECV_4(ep, mr0, mr1, mr2, mr3, reply);
+        SEL4BENCH_READ_CCNT(end);
+        results->reply_0_recv_4_overhead[i] = (end - start);
     }
 
     /* overhead of cycle count */
