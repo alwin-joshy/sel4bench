@@ -6,6 +6,7 @@
 #pragma once
 
 #include <autoconf.h>
+#include <sel4_arch/fault.h>
 
 #define READ_COUNTER_BEFORE SEL4BENCH_READ_CCNT
 #define READ_COUNTER_AFTER  SEL4BENCH_READ_CCNT

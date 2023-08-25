@@ -20,7 +20,7 @@
 # ninja
 #
 set(RELEASE ON CACHE BOOL "Performance optimized build")
-set(PLATFORM "odroidc2" CACHE STRING "Platform to test")
+set(PLATFORM "hifive" CACHE STRING "Platform to test")
 set(FASTPATH ON CACHE BOOL "Turn fastpath on or off")
 set(ARM_HYP OFF CACHE BOOL "ARM EL2 hypervisor features on or off")
 set(MCS OFF CACHE BOOL "MCS kernel")
@@ -32,7 +32,7 @@ set(MCS OFF CACHE BOOL "MCS kernel")
 set(HARDWARE OFF CACHE BOOL "Application to benchmark hardware-related operations")
 
 # default is OFF
-set(FAULT OFF CACHE BOOL "Application to benchmark seL4 faults")
+set(FAULT ON CACHE BOOL "Application to benchmark seL4 faults")
 
 # default is OFF
 set(VCPU OFF CACHE BOOL "Application to benchmark seL4 VCPU performance")
@@ -48,19 +48,19 @@ set(IPC ON CACHE BOOL "Application to benchmark seL4 IPC")
 set(IRQ OFF CACHE BOOL "Application to benchmark seL4 IRQs from inside the kernel")
 
 # default is ON
-set(IRQUSER ON CACHE BOOL "Application to benchmark seL4 IRQs")
+set(IRQUSER OFF CACHE BOOL "Application to benchmark seL4 IRQs")
 
 # default is ON
-set(SCHED ON CACHE BOOL "Application to benchmark seL4 scheduler")
+set(SCHED OFF CACHE BOOL "Application to benchmark seL4 scheduler")
 
 # default is ON
-set(SIGNAL ON CACHE BOOL "Application to benchmark seL4 signals")
+set(SIGNAL OFF CACHE BOOL "Application to benchmark seL4 signals")
 
 # default is ON
-set(MAPPING ON CACHE BOOL "Application to benchmark seL4 mapping a series of pages")
+set(MAPPING OFF CACHE BOOL "Application to benchmark seL4 mapping a series of pages")
 
 # default is ON
-set(SYNC ON CACHE BOOL "Application to benchmark seL4 sync")
+set(SYNC OFF CACHE BOOL "Application to benchmark seL4 sync")
 
 # Allow Early Processing methodology for
 #Signal/"Signal to High Prio Thread" benchmark
