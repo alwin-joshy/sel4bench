@@ -15,7 +15,7 @@
  * @param array values to compute results for.
  * @param desc  further (optional) details about the results
  */
-result_t process_result(size_t n, ccnt_t array[n], result_desc_t desc);
+result_t process_result(size_t n, ccnt_t *array, result_desc_t desc);
 
 /* Compute the variance, standard deviation, mean for a set of values
  * for benchmarks using Early Processing methodology
@@ -25,7 +25,7 @@ result_t process_result(size_t n, ccnt_t array[n], result_desc_t desc);
  * @param array raw values to compute results for
  */
 result_t process_result_early_proc(ccnt_t num, ccnt_t sum, ccnt_t sum2,
-                                   ccnt_t array[num]);
+                                   ccnt_t array);
 
 /**
  * @param ncols    size of the 1st dimension of array.

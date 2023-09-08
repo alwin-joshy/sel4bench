@@ -168,7 +168,7 @@ static double results_variance_early_proc(const size_t num, const ccnt_t sum,
     return variance;
 }
 
-result_t calculate_results_early_proc(ccnt_t num, ccnt_t sum, ccnt_t sum2, ccnt_t array[num])
+result_t calculate_results_early_proc(ccnt_t num, ccnt_t sum, ccnt_t sum2, ccnt_t array)
 {
 
     result_t result;

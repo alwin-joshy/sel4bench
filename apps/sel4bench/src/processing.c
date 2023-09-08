@@ -39,7 +39,7 @@ void process_average_results(int rows, int cols, ccnt_t array[rows][cols], resul
     }
 }
 
-result_t process_result(size_t n, ccnt_t array[n], result_desc_t desc)
+result_t process_result(size_t n, ccnt_t *array, result_desc_t desc)
 {
     array = &array[desc.ignored];
     int size = n - desc.ignored;
@@ -63,7 +63,7 @@ result_t process_result(size_t n, ccnt_t array[n], result_desc_t desc)
     return calculate_results(size, array);
 }
 
-result_t process_result_early_proc(ccnt_t num, ccnt_t sum, ccnt_t sum2, ccnt_t array[num])
+result_t process_result_early_proc(ccnt_t num, ccnt_t sum, ccnt_t sum2, ccnt_t array)
 {
     return calculate_results_early_proc(num, sum, sum2, array);
 }
