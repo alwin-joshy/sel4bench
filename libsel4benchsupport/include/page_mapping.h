@@ -58,18 +58,18 @@ benchmark_params_t page_mapping_benchmark_params[] = {
         .name   = "map 256",
         .npage  = 256,
     },
-    {
-        .name   = "map 512",
-        .npage  = 512,
-    },
-    {
-        .name   = "map 1024",
-        .npage  = 1024,
-    },
-    {
-        .name   = "map 2048",
-        .npage  = 2048,
-    },
+    // {
+    //     .name   = "map 512",
+    //     .npage  = 512,
+    // },
+    // {
+    //     .name   = "map 1024",
+    //     .npage  = 1024,
+    // },
+    // {
+    //     .name   = "map 2048",
+    //     .npage  = 2048,
+    // },
 };
 
 char *phase_name[] = {
@@ -77,10 +77,11 @@ char *phase_name[] = {
     "Allocate Pages",
     "Map the frames into virtual address space",
     "Protect Pages one by one as Read Only",
-    "Protect Pages in range as Read Only",
+    // "Protect Pages in range as Read Only",
     "Unprotect Pages",
-    "Unmap pages one by one with page_unmap",
-    "Unmap Pages using range_unmap",
+    "Range map pages",
+    // "Unmap pages one by one with page_unmap",
+    // "Unmap Pages using range_unmap",
     // "Reuse stale caps with unmap + page_map",
     // "Reuse stale caps with vspace_page_map"
 };

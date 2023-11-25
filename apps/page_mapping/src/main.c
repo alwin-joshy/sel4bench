@@ -140,6 +140,28 @@ static void inline map_pages(seL4_Word addr, seL4_CPtr page_cap, int npage)
     }
 }
 
+#ifdef CONFIG_ARCH_AARCH64
+static void inline range_map_pages(seL4_CPtr addr, seL4_CPtr page_cap, int npage)
+{
+    long err;
+    seL4_CPtr cap_array[32];
+    for (int i = 0; i < npage; i++) {
+        int j = 0;
+        for (j = 0; j < 32 && i + j < npage; j++) {
+            cap_array[j] = page_cap + i + j;
+        }
+
+        err = seL4_ARM_VSpace_Map_Range(SEL4UTILS_PD_SLOT, addr + i * PAGE_SIZE_4K,
+                                        seL4_AllRights, seL4_ARCH_Default_VMAttributes, j, cap_array);
+        assert(err == 0);
+        if (err != 0) {
+            ZF_LOGE("jsut to check");
+        }
+        i += j;
+    }
+}
+#endif
+
 #define PROT_UNPROT_NPAGE(func, right)\
     static void inline func(seL4_CPtr addr, seL4_CPtr page_cap, int npage){\
         long err UNUSED;\
@@ -203,47 +225,11 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-#ifdef CONFIG_ARCH_AARCH64
-    /* Save cptr to the start of the mapping structures for the second region */
-    seL4_CPtr map2_pt_ptr_start = free_slot;
-
-    /* Set up page table for map2 benchmark*/
-    prepare_page_table(addr2, npage, untyped, &free_slot);
-
-    /* Store cptrs to the frame caps */
-    seL4_CPtr map2_ptr_start = free_slot;
-    prepare_pages(npage, untyped, &free_slot);
-
-    /* Map the frames to the second region of memory */
-    map_pages(addr2, map2_ptr_start, npage);
-#endif 
-
     /* Protect mapped page as seL4_CanRead one by one */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
 
     prot_pages(addr, page_ptr_start, npage);
-
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
-    /* Protect mapped page as seL4_CanRead with range protect */
-    seL4_Word start_range = addr2; 
-    seL4_Word end_addr = start_range + npage * PAGE_SIZE_4K;
-
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-    
-#ifdef CONFIG_ARCH_AARCH64
-    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 512) {
-        seL4_ARM_VSpace_Remap_Range_t remap_ret = seL4_ARM_VSpace_Remap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 512), seL4_CanRead);
-        assert(remap_ret.error == 0);
-        assert(remap_ret.remapped == 512 /*(-1U) >> (512 - MIN(npage, 512))*/ );
-        // ZF_LOGE("%lx", remap_ret.remapped);
-
-    }
-#endif 
 
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
@@ -259,33 +245,30 @@ bench_proc(int argc UNUSED, char *argv[])
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-    COMPILER_MEMORY_FENCE();
-    SEL4BENCH_READ_CCNT(start);
-
-    /* Cleaning up the mappings one by one before the next run */
+    /* Cleaning up the mappings one by one*/
     for (int i = 0; i < npage; i++) {
         long err = seL4_ARCH_Page_Unmap(page_ptr_start + i);
         ZF_LOGF_IFERR(err, "ummap page failed\n");
     }
 
-    SEL4BENCH_READ_CCNT(end);
-    COMPILER_MEMORY_FENCE();
-    send_result(result_ep, end - start);
-
+#ifdef CONFIG_ARCH_AARCH64
+    /* Map the frames to a region of memory */
     COMPILER_MEMORY_FENCE();
     SEL4BENCH_READ_CCNT(start);
-    
-    for (seL4_CPtr curr = map2_ptr_start; curr < map2_ptr_start + npage; curr += 512) {
-        seL4_ARM_VSpace_Unmap_Range_t unmap_ret = seL4_ARM_VSpace_Unmap_Range(SEL4UTILS_PD_SLOT, curr, MIN(npage, 512));
-        ZF_LOGF_IFERR(unmap_ret.error, "ummap range failed\n");
-        assert(unmap_ret.unmapped == 512 /*(-1U) >> (512 - MIN(npage, 512))*/);
-    }
+
+    range_map_pages(addr, page_ptr_start, npage);
 
     SEL4BENCH_READ_CCNT(end);
     COMPILER_MEMORY_FENCE();
     send_result(result_ep, end - start);
 
-#ifdef CONFIG_ARM_AARCH64
+    /* Cleaning up the mappings one by one*/
+    for (int i = 0; i < npage; i++) {
+        long err = seL4_ARCH_Page_Unmap(page_ptr_start + i);
+        ZF_LOGF_IFERR(err, "ummap page failed\n");
+    }
+
+#endif 
     for (int i = pt_ptr_start; i < page_ptr_start; i++) {
         int err = seL4_ARM_PageUpperDirectory_Unmap(i);
         if (err) {
@@ -295,19 +278,6 @@ bench_proc(int argc UNUSED, char *argv[])
             }
         }
     }
-    #endif
-
-#ifdef CONFIG_ARCH_AARCH64
-    for (int i = map2_pt_ptr_start; i < map2_ptr_start; i++) {
-        int err = seL4_ARM_PageUpperDirectory_Unmap(i);
-        if (err) {
-            err = seL4_ARM_PageDirectory_Unmap(i);
-            if (err) {
-                err = seL4_ARM_PageTable_Unmap(i);
-            }
-        }
-    }
-#endif
 
     sel4bench_destroy();
 }
@@ -403,7 +373,7 @@ int main(int argc, char *argv[])
 
     measure_overhead(results);
 
-    /* Warmup */
+    // /* Warmup */
     proc.untyped = sel4utils_copy_path_to_process(&proc.process,
                                                   untyped_path);
     proc.npage = 16;
@@ -418,7 +388,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < RUNS; i++) {
         /* Reduced from max 2048 pages to 1024 because we are not given enough memory*/
-        for (int j = 0; j < TESTS - 1; j++) {
+        for (int j = 0; j < TESTS; j++) {
             proc.untyped = sel4utils_copy_path_to_process(&proc.process,
                                                           untyped_path);
             proc.npage = page_mapping_benchmark_params[j].npage;
