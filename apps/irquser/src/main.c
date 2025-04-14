@@ -130,6 +130,8 @@ int main(int argc, char **argv)
         ZF_LOGF("Failed to allocate endpoint\n");
     }
 
+    ZF_LOGF("In IRQUSER!!!!");
+
     /* set up globals */
     done_ep = endpoint.cptr;
     timer_signal = env->ntfn.cptr;

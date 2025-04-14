@@ -234,7 +234,6 @@ json_t *launch_benchmark(benchmark_t *benchmark, env_t *env)
     if (exit_code == EXIT_SUCCESS) {
         json = benchmark->process(results);
     }
-
     /* free results */
     vspace_unmap_pages(&env->vspace, results, benchmark->results_pages, seL4_PageBits, VSPACE_FREE);
     vspace_unmap_pages(&env->vspace, args, 1, seL4_PageBits, VSPACE_FREE);
@@ -278,7 +277,7 @@ void *main_continued(void *arg)
         page_mapping_benchmark_new(),
         smp_benchmark_new(),
         vcpu_benchmark_new(),
-
+        scratch_benchmark_new(),
         /* null terminator */
         NULL
     };
@@ -296,7 +295,6 @@ void *main_continued(void *arg)
             ZF_LOGF_IF(error != 0, "Failed to add benchmark results");
         }
     }
-
     printf("JSON OUTPUT\n");
     error = json_dumpf(output, stdout, JSON_PRESERVE_ORDER | JSON_INDENT(CONFIG_JSON_INDENT));
     ZF_LOGF_IF(error, "Failed to dump output");

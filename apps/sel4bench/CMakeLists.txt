@@ -73,6 +73,7 @@ add_subdirectory(../smp smp)
 add_subdirectory(../sync sync)
 add_subdirectory(../vcpu vcpu)
 # Add new benchmark applications here
+add_subdirectory(../scratch scratch)
 
 add_subdirectory(../../libsel4benchsupport libsel4benchsupport)
 
@@ -105,6 +106,7 @@ if(Sel4Bench)
         sel4benchpagemapping_Config
         sel4benchscheduler_Config
         sel4benchsignal_Config
+        sel4benchscratch_Config
         smp_Config
         sel4benchsync_Config
         sel4benchvcpu_Config

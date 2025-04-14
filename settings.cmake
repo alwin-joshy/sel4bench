@@ -59,6 +59,9 @@ if(NOT Sel4benchAllowSettingsOverride)
 
     endif()
 
+    set(KernelVerificationBuild OFF CACHE BOOL "" FORCE)
+    set(KernelPrinting ON CACHE BOOL "" FORCE)
+
     if (KernelSel4ArchAarch32)
         set(KernelArmTLSReg tpidruro CACHE STRING "" FORCE)
     endif()
@@ -175,4 +178,10 @@ if(NOT Sel4benchAllowSettingsOverride)
     endif()
 
     # Add new app-specific configuration here
+
+    if(SCRATCH)
+        set(AppScratchBench ON CACHE BOOL "" FORCE)
+    else()
+        set(AppScratchBench OFF CACHE BOOL "" FORCE)
+    endif()
 endif()

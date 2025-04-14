@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2025, UNSW Sydney
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
