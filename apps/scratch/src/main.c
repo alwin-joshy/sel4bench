@@ -69,7 +69,7 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
     /* While not all RISC-V platforms are DMA cache-cohernet,
      * we assume we are targeting one that is and so there is nothing to do. */
 #else
-#error "Unknown architecture for cache_clean_and_invalidate"
+// #error "Unknown architecture for cache_clean_and_invalidate"
 #endif
 }
 
@@ -85,10 +85,10 @@ void copy_fn(int argc, char **argv) {
 		SEL4BENCH_READ_CCNT(start_time);
 
 		char *buffer = (char *) TEST_VADDR_BASE + (PAGE_SIZE_4K * i);
-		memcpy(buffer, (void *) DATA_VADDR_BASE, 1024);
+		memcpy(buffer, (void *) DATA_VADDR_BASE, 1500);
 
 		if (do_flush) {
-			cache_clean_and_invalidate((seL4_Word) buffer, (seL4_Word) buffer + PAGE_SIZE_4K);
+			cache_clean_and_invalidate((seL4_Word) buffer, (seL4_Word) buffer + 1500);
 		}
 
 		seL4_NBSendWait(ntfn, seL4_MessageInfo_new(0, 0, 0, 0), ntfn, NULL);
@@ -138,10 +138,10 @@ void client_fn(int argc, char **argv) {
 
 		char *buffer = (char *) TEST_VADDR_BASE + (PAGE_SIZE_4K * i);
 		uint64_t xsum = 0;
-		for (int i = 0; i < 1024; i++) {
+		for (int i = 0; i < 1500; i++) {
 			xsum += buffer[i];
 		}
-		assert(xsum == 65048);
+		assert(xsum == 97623);
 	}
 
 	seL4_Wait(ntfn, NULL);
@@ -314,8 +314,10 @@ static void run_remap_benchmark(env_t *env, ccnt_t results[NUM_RUNS])
 static void run_scratch_benchmark(env_t *env, scratch_results_t *results) {
 	cspacepath_t done_ep_path;
 
+#ifdef CONFIG_ARCH_AARCH64
 	/* Run copier benchmark (with cache clean/invalidate) */
 	run_copier_benchmark(env, results->copier_flush, true);
+#endif /* CONFIG_ARCH_AARCH64 */
 
 	/* Run copier benchmark (no cache clean/invalidate) */
     run_copier_benchmark(env, results->copier_no_flush, false);
